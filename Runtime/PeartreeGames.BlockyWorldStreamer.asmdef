@@ -1,0 +1,18 @@
+﻿{
+  "name": "PeartreeGames.BlockyWorldStreamer",
+  "rootNamespace": "PeartreeGames.BlockyWorldStreamer",
+  "references": [
+    "PeartreeGames.BlockyWorldEditor",
+    "Unity.Addressables",
+    "Unity.ResourceManager"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
