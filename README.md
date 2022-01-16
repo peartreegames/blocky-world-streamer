@@ -14,6 +14,7 @@ then the repo can be added
 ## Overview
 
 The Blocky World Streamer has three primary functions
+
     1. Act as a ParentSetter module for the BlockyWorldEditor by placing GameObjects into a grid of scenes.
     2. Optimize those objects by combining meshes and colliders.
     3. Stream those scenes at runtime based on the player/camera position.
