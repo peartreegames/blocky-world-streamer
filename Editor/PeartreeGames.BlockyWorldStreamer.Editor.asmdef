@@ -4,6 +4,7 @@
   "references": [
     "PeartreeGames.BlockyWorldEditor",
     "PeartreeGames.BlockyWorldEditor.Editor",
+    "PeartreeGames.BlockyWorldStreamer",
     "Unity.Addressables",
     "Unity.Addressables.Editor",
     "Unity.ResourceManager"

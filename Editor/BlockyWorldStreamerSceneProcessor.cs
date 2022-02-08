@@ -11,7 +11,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         public int callbackOrder { get; }
         public void OnProcessScene(Scene scene, BuildReport report)
         {
-            var mapParent = BlockyWorldGridParentSetter.GetMapParent(scene);
+            var mapParent = BlockyWorldStreamerParentSetter.GetMapParent(scene, "Map");
             if (mapParent == null) return;
             for(var i = mapParent.transform.childCount - 1; i >= 0; i--)
             {
