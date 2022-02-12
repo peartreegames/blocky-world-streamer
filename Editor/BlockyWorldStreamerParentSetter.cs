@@ -45,7 +45,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             var center = BlockyWorldUtilities.GetCellPosition(pos);
             var cell = BlockyWorldUtilities.GetCellFromWorldPosition(position);
             var sceneName = BlockyWorldUtilities.GetScenePathFromCell(cell);
-            if (!MapParents.TryGetValue(sceneName, out var mapParent))
+            if (!MapParents.TryGetValue($"{sceneName}_{mapParentName}", out var mapParent))
             {
                 var sceneGuids = AssetDatabase.FindAssets("t:Scene");
                 var foundScene = sceneGuids.Any(sceneGuid =>
@@ -92,8 +92,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             }
 
             var quadPos = BlockyWorldUtilities.GetQuadPosition(pos);
-            var x = Mathf.RoundToInt(quadPos.x / BlockyWorldUtilities.SceneQuadSize);
-            var z = Mathf.RoundToInt(quadPos.z / BlockyWorldUtilities.SceneQuadSize);
+            var x = Mathf.RoundToInt((quadPos.x - center.x) / BlockyWorldUtilities.SceneQuadSize);
+            var z = Mathf.RoundToInt((quadPos.z - center.z) / BlockyWorldUtilities.SceneQuadSize);
             var quad = mapParent.transform.Find($"{x},{z}")?.gameObject;
             if (quad != null) return quad.transform;
             quad = new GameObject {name = $"{x},{z}", transform = {position = quadPos}};

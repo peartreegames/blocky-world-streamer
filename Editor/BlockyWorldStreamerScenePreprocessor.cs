@@ -95,7 +95,6 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             var colliderSelectionObject = new GameObject("ColliderSelection");
             colliderSelectionObject.transform.SetParent(collidersContainer.transform);
             offset = new Vector3(0, 0.5f, 0);
-            var newCount = 0;
             for (var i = 0; i <= maxHeight; i++)
             {
                 if (!colliderPositions.ContainsKey(i)) continue;
@@ -107,7 +106,6 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                     var col = colliderSelectionObject.AddComponent<BoxCollider>();
                     col.center = bound.center + offset;
                     col.size = bound.size;
-                    newCount++;
                 }
             }
 

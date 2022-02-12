@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using PeartreeGames.EvtVariables;
@@ -14,7 +13,10 @@ namespace PeartreeGames.BlockyWorldStreamer
     {
         [SerializeField] private EvtTransformObject target;
         [SerializeField] private float loadDelay = 2f;
+        [SerializeField] private bool debug;
+        public List<EvtBoolObject> readyObjects;
         
+
         public static readonly EvtEvent OnWorldSceneReady = new();
         private Vector2Int CurrentCell { get; set; }
         private Vector2Int NextCell { get; set; }
@@ -25,34 +27,26 @@ namespace PeartreeGames.BlockyWorldStreamer
         private bool _isLoading;
         private List<BlockySceneAction> _actions;
 
+
         private void Awake()
         {
             _actions = new List<BlockySceneAction>();
             _loadedScenes = new Dictionary<Vector2Int, SceneInstance>();
-#if !UNITY_EDITOR
-            Cursor.visible = false;
-            Cursor.lockState = CursorLockMode.Locked;
-#endif
         }
 
         private void Update()
         {
             var targetCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
-            if (targetCell != CurrentCell)
-            {
-                if (targetCell == NextCell) _loadDelay -= Time.deltaTime;
-                else
-                {
-                    NextCell = targetCell;
-                    _loadDelay = loadDelay;
-                }
+            if (targetCell == CurrentCell) _loadDelay = loadDelay;
+            if (targetCell == NextCell) _loadDelay -= Time.deltaTime;
+            else NextCell = targetCell;
 
-                if (_loadDelay < 0)
-                {
-                    CurrentCell = NextCell;
-                    LoadScene(CurrentCell);
-                }
+            if (_loadDelay < 0)
+            {
+                CurrentCell = targetCell;
+                RequestSceneLoad(CurrentCell);
             }
+
             if (_actions.Count == 0 || _isLoading) return;
             var next = _actions.Max();
             _loadingCoroutine.cell = next.Cell;
@@ -74,21 +68,18 @@ namespace PeartreeGames.BlockyWorldStreamer
             enabled = false;
             while (target.Value == null) yield return null;
             SceneManager.SetActiveScene(gameObject.scene);
-            yield return new WaitForSeconds(1f);
             CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
-            yield return LoadSubScene(CurrentCell);
-            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad) yield return LoadSubScene(load);
+            yield return LoadSceneCell(CurrentCell);
+            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad) yield return LoadSceneCell(load);
+            while (!readyObjects.TrueForAll(obj => obj.Value)) yield return null;
             enabled = true;
             OnWorldSceneReady?.Invoke();
         }
 
-        public void LoadScene(Vector2Int cell)
+        public void RequestSceneLoad(Vector2Int cell)
         {
             var sceneName = BlockyWorldUtilities.GetScenePathFromCell(cell);
-            if (!SceneManager.GetSceneByName(sceneName).isLoaded) 
-            {
-                EnqueueLoad(cell, 20);
-            }
+            if (!SceneManager.GetSceneByName(sceneName).isLoaded) EnqueueLoad(cell, 20);
             EnqueueNeighbours(cell);
         }
 
@@ -96,7 +87,7 @@ namespace PeartreeGames.BlockyWorldStreamer
         {
             if (_loadingCoroutine.cell == cell && _loadingCoroutine.co != null) StopCoroutine(_loadingCoroutine.co);
             _actions.RemoveAll(action => action.Cell == cell);
-            var action = new BlockySceneAction(cell, LoadSubScene, priority);
+            var action = new BlockySceneAction(cell, LoadSceneCell, priority);
             _actions.Add(action);
         }
 
@@ -120,10 +111,10 @@ namespace PeartreeGames.BlockyWorldStreamer
         {
             if (_loadingCoroutine.cell == cell && _loadingCoroutine.co != null) StopCoroutine(_loadingCoroutine.co);
             _actions.RemoveAll(action => action.Cell == cell);
-            _actions.Add(new BlockySceneAction(cell, UnloadSubScene, 0));
+            _actions.Add(new BlockySceneAction(cell, UnloadSceneCell, 0));
         }
 
-        private IEnumerator UnloadSubScene(Vector2Int cell)
+        private IEnumerator UnloadSceneCell(Vector2Int cell)
         {
             _isLoading = true;
             if (_loadedScenes.TryGetValue(cell, out var instance))
@@ -131,44 +122,67 @@ namespace PeartreeGames.BlockyWorldStreamer
                 yield return Addressables.UnloadSceneAsync(instance);
                 _loadedScenes.Remove(cell);
             }
+
             _isLoading = false;
         }
-        
-        private IEnumerator LoadSubScene(Vector2Int cell)
+
+        private IEnumerator LoadSceneCell(Vector2Int cell)
         {
             _isLoading = true;
             var sceneName = BlockyWorldUtilities.GetScenePathFromCell(cell);
-            if (SceneManager.GetSceneByName(sceneName).isLoaded)
-            {
-                _isLoading = false;
-                yield break;
-            }
+            if (SceneManager.GetSceneByName(sceneName).isLoaded) goto complete;
+
             var key = Addressables.LoadResourceLocationsAsync(sceneName);
             while (!key.IsDone) yield return null;
-            if (key.Result.Count == 0)
-            {
-                _isLoading = false;
-                yield break;
-            }
+            if (key.Result.Count == 0) goto complete;
+
             var loadAo = Addressables.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
             if (!loadAo.IsValid())
             {
-                _isLoading = false;
                 Debug.LogError($"{sceneName} is not a valid address!");
-                yield break;
+                goto complete;
             }
 
-            while (!loadAo.IsDone) {yield return null;}
+            while (!loadAo.IsDone) yield return null;
+
             _loadedScenes.Add(cell, loadAo.Result);
+            yield return new WaitForSeconds(0.2f);
+
+            complete:
             _isLoading = false;
-            // var roots = loadAo.Result.Scene.GetRootGameObjects();
-            // foreach (var root in roots)
-            // {
-            //     if (!root.TryGetComponent<PreAwakeController>(out var preAwake)) continue;
-            //     // ConsoleProDebug.LogScene($"{scene.SceneName} Running PreAwakeController");
-            //     yield return preAwake.PreAwake();
-            //     break;
-            // }
+        }
+
+        private void OnDrawGizmos()
+        {
+            if (!debug) return;
+            var size = new Vector3(BlockyWorldUtilities.SceneGridSize, 0, BlockyWorldUtilities.SceneGridSize);
+            Gizmos.color = Color.cyan;
+            var neighbours = BlockyWorldUtilities.GetNeighbouringCells(CurrentCell);
+            for (var x = -25; x < 25; x++)
+            {
+                for (var y = -25; y < 25; y++)
+                {
+                    var cell = new Vector2Int(x, y);
+                    var pos = new Vector3(x * BlockyWorldUtilities.SceneGridSize, 0,
+                        y * BlockyWorldUtilities.SceneGridSize);
+                    Gizmos.DrawWireCube(pos, size);
+                    if (CurrentCell == cell)
+                    {
+                        Gizmos.color = Color.cyan * 0.5f;
+                        Gizmos.DrawCube(pos, size);
+                    }
+
+                    if (neighbours.Contains(cell))
+                    {
+                        Gizmos.color = Color.cyan * 0.25f;
+                        Gizmos.DrawCube(pos, size);
+                    }
+                    Gizmos.color = Color.cyan;
+                }
+            }
+            if (target.Value == null) return;
+            Gizmos.color = new Color(0.4f, 1, 0.4f, 1);
+            Gizmos.DrawSphere(target.Value.position, 3);
         }
     }
 }

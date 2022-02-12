@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using PeartreeGames.BlockyWorldEditor;
 using UnityEngine;
 
@@ -31,6 +32,14 @@ namespace PeartreeGames.BlockyWorldStreamer
             var targetPos = Vector3Int.RoundToInt(pos);
             var center = GetCellPosition(targetPos);
             return new Vector2Int(Mathf.RoundToInt(center.x / SceneGridSize), Mathf.RoundToInt(center.z / SceneGridSize));
+        }
+
+        public static Vector2Int GetCellFromSceneName(string name)
+        {
+            var regex = new Regex(@"\((?<numbers>[^)]*)\)");
+            var match = regex.Match(name).Groups["numbers"];
+            var numbers = match.Value.Split(',');
+            return new Vector2Int(int.Parse(numbers[0]), int.Parse(numbers[1]));
         }
 
         public static string GetScenePathFromCell(Vector2Int pos) => $"{ScenePrefix}{pos}";
