@@ -14,22 +14,27 @@ namespace PeartreeGames.BlockyWorldStreamer
         [SerializeField] private EvtTransformObject target;
         [SerializeField] private float loadDelay = 2f;
         [SerializeField] private bool debug;
+        [SerializeField] private bool quickLoad;
+
         public List<EvtBoolObject> readyObjects;
-        
+
 
         public static readonly EvtEvent OnWorldSceneReady = new();
         private Vector2Int CurrentCell { get; set; }
         private Vector2Int NextCell { get; set; }
-        private float _loadDelay;
 
         private Dictionary<Vector2Int, SceneInstance> _loadedScenes;
-        private (Vector2Int cell, IEnumerator co) _loadingCoroutine;
-        private bool _isLoading;
         private List<BlockySceneAction> _actions;
+        private (Vector2Int cell, IEnumerator co) _loadingCoroutine;
+        private float _loadDelay;
+        private bool _isLoading;
 
 
         private void Awake()
         {
+#if !DEVELOPMENT_BUILD && !UNITY_EDITOR
+            quickLoad = false;
+#endif
             _actions = new List<BlockySceneAction>();
             _loadedScenes = new Dictionary<Vector2Int, SceneInstance>();
         }
@@ -57,6 +62,7 @@ namespace PeartreeGames.BlockyWorldStreamer
 
         private IEnumerator Start()
         {
+            enabled = false;
 #if UNITY_EDITOR
             for (var i = 0; i < SceneManager.sceneCount; i++)
             {
@@ -65,13 +71,18 @@ namespace PeartreeGames.BlockyWorldStreamer
                     yield return SceneManager.UnloadSceneAsync(scene);
             }
 #endif
-            enabled = false;
+
             while (target.Value == null) yield return null;
             SceneManager.SetActiveScene(gameObject.scene);
             CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
+
             yield return LoadSceneCell(CurrentCell);
-            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad) yield return LoadSceneCell(load);
-            while (!readyObjects.TrueForAll(obj => obj.Value)) yield return null;
+            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad)
+            {
+                if (quickLoad) StartCoroutine(LoadSceneCell(load));
+                else yield return LoadSceneCell(load);
+            }
+            if (!quickLoad) while (!readyObjects.TrueForAll(obj => obj.Value)) yield return null;
             enabled = true;
             OnWorldSceneReady?.Invoke();
         }
@@ -177,9 +188,11 @@ namespace PeartreeGames.BlockyWorldStreamer
                         Gizmos.color = Color.cyan * 0.25f;
                         Gizmos.DrawCube(pos, size);
                     }
+
                     Gizmos.color = Color.cyan;
                 }
             }
+
             if (target.Value == null) return;
             Gizmos.color = new Color(0.4f, 1, 0.4f, 1);
             Gizmos.DrawSphere(target.Value.position, 3);

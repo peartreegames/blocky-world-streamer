@@ -1,6 +1,6 @@
 {
   "name": "com.peartreegames.blockyworldstreamer",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "displayName": "Blocky World Streamer",
   "description": "Blocky Object Placer and World Streamer",
   "unity": "2021.2",
@@ -9,7 +9,7 @@
   "changelogUrl": "https://github.com/peartreegames/blocky-world-streamer/changelog.html",
   "licensesUrl": "https://github.com/peartreegames/blocky-world-streamer/licensing.html",
   "dependencies": {
-    "com.peartreegames.blockyworldeditor": "0.1.5",
+    "com.peartreegames.blockyworldeditor": "0.1.6",
     "com.peartreegames.evtvariables": "0.1.1",
     "com.unity.modules.uielements": "0.1.0"
   },

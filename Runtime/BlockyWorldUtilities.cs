@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using PeartreeGames.BlockyWorldEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace PeartreeGames.BlockyWorldStreamer
 {
@@ -50,7 +52,82 @@ namespace PeartreeGames.BlockyWorldStreamer
         public static Vector3 GetQuadPosition(Vector3Int target) =>
             BlockyUtilities.SnapToGrid(target - new Vector3(SceneQuadExtents, 0, SceneQuadExtents), 0, SceneQuadSize) + new Vector3(SceneQuadExtents, 0, SceneQuadExtents);
         
-        public static Bounds[] DecomposeBounds(Vector3Int[] positions)
+        public static GameObject CombineColliders(GameObject obj)
+        {
+            if (ExceptionNames.Any(e => obj.name.Contains(e))) return null;
+            var prevColliders = obj.transform.parent.Find($"{obj.name}_Colliders");
+            if (prevColliders != null) Object.DestroyImmediate(prevColliders.gameObject);
+
+            var originalPos = obj.transform.position;
+            obj.transform.position = Vector3.zero;
+
+            var colliders = obj.GetComponentsInChildren<BoxCollider>();
+            var maxHeight = int.MinValue;
+            var minHeight = int.MaxValue;
+            var colliderPositions = new Dictionary<int, (List<Vector3Int> list, GameObject go)>();
+            var offset = Vector3.one * 0.25f;
+            var collidersContainer = new GameObject($"{obj.name}_Colliders")
+            {
+                isStatic = true,
+                layer = obj.layer
+            };
+            var collidersByLayer = new Dictionary<LayerMask, GameObject>();
+            
+            foreach (var col in colliders)
+            {
+                if (!collidersByLayer.TryGetValue(col.gameObject.layer, out var colliderParent))
+                {
+                    colliderParent = new GameObject(LayerMask.LayerToName(col.gameObject.layer))
+                    {
+                        layer = col.gameObject.layer
+                    };
+                    colliderParent.transform.SetParent(collidersContainer.transform);
+                    collidersByLayer.Add(col.gameObject.layer, colliderParent);
+                }
+                if (!col.size.Equals(Vector3.one) || Mathf.Abs(Mathf.RoundToInt(col.transform.position.y % 1)) != 0)
+                {
+                    var newCol = colliderParent.AddComponent<BoxCollider>();
+                    var pivot = col.transform.position;
+                    var point = pivot + col.center;
+                    var rot = col.transform.rotation;
+                    newCol.center = rot * (point - pivot) + pivot;
+                    var size = rot * col.size;
+                    newCol.size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
+                    continue;
+                }
+                var pos = col.gameObject.transform.position;
+                var height = pos.y;
+                pos -= offset;
+                var key = Mathf.RoundToInt(height);
+                if (key > maxHeight) maxHeight = key;
+                if (key < minHeight) minHeight = key;
+                if (!colliderPositions.ContainsKey(key)) colliderPositions.Add(key, (new List<Vector3Int>(), colliderParent));
+                colliderPositions[key].list.Add(Vector3Int.RoundToInt(pos));
+            }
+
+
+            offset = new Vector3(-0.5f, -0.5f, -0.5f);
+            for (var i = minHeight; i <= maxHeight; i++)
+            {
+                if (!colliderPositions.ContainsKey(i)) continue;
+                var cols = colliderPositions[i];
+                if (cols.list.Count == 0) continue;
+                var bounds = DecomposeBounds(cols.list.ToArray());
+                foreach (var bound in bounds)
+                {
+                    var col = cols.go.AddComponent<BoxCollider>();
+                    col.center = bound.center + offset;
+                    col.size = bound.size;
+                }
+            }
+
+            collidersContainer.transform.position = originalPos;
+            obj.transform.position = originalPos;
+            obj.SetActive(false);
+            return collidersContainer;
+        }
+
+        public static Bounds[] DecomposeBounds(Vector3Int[] positions, float height = 0.5f)
         {
             if (positions.Length == 0) return Array.Empty<Bounds>();
             var result = new List<Bounds>();
@@ -165,13 +242,15 @@ namespace PeartreeGames.BlockyWorldStreamer
             {
                 var left = r.TopLeft + pMin;
                 var right = r.BottomRight + pMin;
-                var center = new Vector3((left.x + right.x) / 2f + 0.5f, 0, (left.y + right.y) / 2f + 0.5f);
-                var extends = new Vector3(Mathf.Abs(center.x - left.x), 0.5f,
+                var center = new Vector3((left.x + right.x) / 2f + 0.5f, p1.y, (left.y + right.y) / 2f + 0.5f);
+                var extends = new Vector3(Mathf.Abs(center.x - left.x), height,
                     Mathf.Abs(center.z - right.y)) * 2;
                 result.Add(new Bounds(center, extends));
             }
 
             return result.ToArray();
         }
+
+        public static readonly string[] ExceptionNames = {"Exclusions", "Colliders"};
     }
 }

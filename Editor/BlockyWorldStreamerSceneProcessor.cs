@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -16,7 +17,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             for(var i = mapParent.transform.childCount - 1; i >= 0; i--)
             {
                 var child = mapParent.transform.GetChild(i);
-                if (child.gameObject.name.Contains("Combined")) continue;
+                if (BlockyWorldUtilities.ExceptionNames.Any(e => child.gameObject.name.Contains(e))) continue;
                 Object.DestroyImmediate(child.gameObject);
             }
         }
