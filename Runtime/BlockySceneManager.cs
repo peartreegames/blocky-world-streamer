@@ -15,9 +15,9 @@ namespace PeartreeGames.BlockyWorldStreamer
         [SerializeField] private float loadDelay = 2f;
         [SerializeField] private bool debug;
         [SerializeField] private bool quickLoad;
+        [SerializeField] private EvtIntObject dayObject;
 
         public List<EvtBoolObject> readyObjects;
-
 
         public static readonly EvtEvent OnWorldSceneReady = new();
         private Vector2Int CurrentCell { get; set; }
@@ -63,6 +63,7 @@ namespace PeartreeGames.BlockyWorldStreamer
         private IEnumerator Start()
         {
             enabled = false;
+            while (target.Value == null) yield return null;
 #if UNITY_EDITOR
             for (var i = 0; i < SceneManager.sceneCount; i++)
             {
@@ -71,9 +72,8 @@ namespace PeartreeGames.BlockyWorldStreamer
                     yield return SceneManager.UnloadSceneAsync(scene);
             }
 #endif
-
-            while (target.Value == null) yield return null;
             SceneManager.SetActiveScene(gameObject.scene);
+            
             CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
 
             yield return LoadSceneCell(CurrentCell);
@@ -89,7 +89,7 @@ namespace PeartreeGames.BlockyWorldStreamer
 
         public void RequestSceneLoad(Vector2Int cell)
         {
-            var sceneName = BlockyWorldUtilities.GetScenePathFromCell(cell);
+            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
             if (!SceneManager.GetSceneByName(sceneName).isLoaded) EnqueueLoad(cell, 20);
             EnqueueNeighbours(cell);
         }
@@ -140,25 +140,34 @@ namespace PeartreeGames.BlockyWorldStreamer
         private IEnumerator LoadSceneCell(Vector2Int cell)
         {
             _isLoading = true;
-            var sceneName = BlockyWorldUtilities.GetScenePathFromCell(cell);
-            if (SceneManager.GetSceneByName(sceneName).isLoaded) goto complete;
+            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
+            if (SceneManager.GetSceneByName(sceneName).isLoaded) goto loadDay;
 
             var key = Addressables.LoadResourceLocationsAsync(sceneName);
             while (!key.IsDone) yield return null;
             if (key.Result.Count == 0) goto complete;
 
             var loadAo = Addressables.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
-            if (!loadAo.IsValid())
-            {
-                Debug.LogError($"{sceneName} is not a valid address!");
-                goto complete;
-            }
+            if (!loadAo.IsValid()) goto complete;
 
             while (!loadAo.IsDone) yield return null;
-
             _loadedScenes.Add(cell, loadAo.Result);
             yield return new WaitForSeconds(0.2f);
+            
+            loadDay:
+            var daySceneName = $"{sceneName}_{dayObject.Value:000}";
+            if (SceneManager.GetSceneByName(daySceneName).isLoaded) goto complete;
+            
+            var dayKey = Addressables.LoadResourceLocationsAsync(sceneName);
+            while (!dayKey.IsDone) yield return null;
+            if (dayKey.Result.Count == 0) goto complete;
 
+            var dayLoadAo = Addressables.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            if (!dayLoadAo.IsValid()) goto complete;
+            
+
+            while (!dayLoadAo.IsDone) yield return null;
+            
             complete:
             _isLoading = false;
         }

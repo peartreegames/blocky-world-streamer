@@ -9,14 +9,15 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 {
     public class BlockyWorldSceneProcessor : IProcessSceneWithReport
     {
-        public int callbackOrder { get; }
+        public int callbackOrder => -1;
         public void OnProcessScene(Scene scene, BuildReport report)
         {
             var mapParent = BlockyWorldStreamerParentSetter.GetMapParent(scene, "Map");
             if (mapParent == null) return;
-            for(var i = mapParent.transform.childCount - 1; i >= 0; i--)
+            var children = mapParent.transform.Cast<Transform>().Select(t => t.gameObject).ToArray();
+            for(var i = children.Length - 1; i >= 0; i--)
             {
-                var child = mapParent.transform.GetChild(i);
+                var child = children[i];
                 if (BlockyWorldUtilities.ExceptionNames.Any(e => child.gameObject.name.Contains(e))) continue;
                 Object.DestroyImmediate(child.gameObject);
             }

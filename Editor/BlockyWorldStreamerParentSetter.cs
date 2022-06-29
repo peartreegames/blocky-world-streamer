@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using PeartreeGames.BlockyWorldEditor;
 using PeartreeGames.BlockyWorldEditor.Editor;
@@ -7,6 +8,7 @@ using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Random = UnityEngine.Random;
 
@@ -41,12 +43,15 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
             foreach (var neighbour in neighbours)
             {
-                var sceneName = BlockyWorldUtilities.GetScenePathFromCell(neighbour);
+                var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(neighbour);
                 var foundScene = sceneGuids.FirstOrDefault(sceneGuid =>
                     GetSceneNameFromPath(AssetDatabase.GUIDToAssetPath(sceneGuid)) == sceneName);
                 if (foundScene == string.Empty) continue;
-                if (SceneManager.GetSceneByName(sceneName).isLoaded) continue;
-                EditorSceneManager.OpenScene($"Assets/Scenes/World/{sceneName}.unity", OpenSceneMode.Additive);
+                var neighbourScene = SceneManager.GetSceneByName(sceneName);
+                if (neighbourScene.isLoaded) continue;
+                var path = $"Assets/Scenes/World/{sceneName}.unity";
+                if (!File.Exists(path)) continue;
+                EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
             }
         }
 
@@ -103,7 +108,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             var pos = Vector3Int.RoundToInt(position);
             var center = BlockyWorldUtilities.GetCellPosition(pos);
             var cell = BlockyWorldUtilities.GetCellFromWorldPosition(position);
-            var sceneName = BlockyWorldUtilities.GetScenePathFromCell(cell);
+            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
             if (!MapParents.TryGetValue($"{sceneName}_{mapParentName}", out var mapParent))
             {
                 var sceneGuids = AssetDatabase.FindAssets("t:Scene");
@@ -176,6 +181,18 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             center.y = gridHeight;
             Handles.DrawWireCube(center,
                 new Vector3(BlockyWorldUtilities.SceneGridSize, 0, BlockyWorldUtilities.SceneGridSize));
+            var zTest = Handles.zTest;
+            Handles.zTest = CompareFunction.Less;
+            var y = center.y - 1.001f;
+            Handles.DrawSolidRectangleWithOutline(new []
+            {
+                new Vector3(center.x - BlockyWorldUtilities.SceneGridSize / 2f, y, center.z - BlockyWorldUtilities.SceneGridSize / 2f),
+                new Vector3(center.x - BlockyWorldUtilities.SceneGridSize / 2f, y, center.z + BlockyWorldUtilities.SceneGridSize / 2f),
+                new Vector3(center.x + BlockyWorldUtilities.SceneGridSize / 2f, y, center.z + BlockyWorldUtilities.SceneGridSize / 2f),
+                new Vector3(center.x + BlockyWorldUtilities.SceneGridSize / 2f, y, center.z - BlockyWorldUtilities.SceneGridSize / 2f),
+                
+            }, primaryColor, primaryColor * 0.5f);
+            Handles.zTest = zTest;
             var quad = BlockyWorldUtilities.GetQuadPosition(target);
             quad.y = gridHeight;
             Handles.color = secondaryColor;

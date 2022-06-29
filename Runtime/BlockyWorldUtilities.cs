@@ -44,7 +44,7 @@ namespace PeartreeGames.BlockyWorldStreamer
             return new Vector2Int(int.Parse(numbers[0]), int.Parse(numbers[1]));
         }
 
-        public static string GetScenePathFromCell(Vector2Int pos) => $"{ScenePrefix}{pos}";
+        public static string GetSceneNameFromCell(Vector2Int pos) => $"{ScenePrefix}{pos}";
         
         public static Vector3 GetCellPosition(Vector3Int target) =>
             BlockyUtilities.SnapToGrid(target - BlockyUtilities.GridOffset, 0, SceneGridSize) + BlockyUtilities.GridOffset;

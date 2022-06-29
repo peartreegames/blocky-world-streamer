@@ -8,8 +8,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
     [Serializable]
     public class BlockySceneReference : AssetReference, IEquatable<BlockySceneReference>
     {
-        [SerializeField] private string sceneName = default;
-        [SerializeField] private string scenePath = default;
+        [SerializeField] private string sceneName;
+        [SerializeField] private string scenePath;
         public string SceneName => sceneName;
         public string ScenePath => scenePath;
 
@@ -28,7 +28,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
         public override bool ValidateAsset(UnityEngine.Object obj)
         {
-            return (obj != null) && (obj is SceneAsset);
+            return obj != null && obj is SceneAsset;
         }
 
         public override bool SetEditorAsset(UnityEngine.Object value)
@@ -65,7 +65,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
         public override int GetHashCode()
         {
-            return (sceneName != null ? sceneName.GetHashCode() : 0);
+            return sceneName != null ? sceneName.GetHashCode() : 0;
         }
     }
 }
