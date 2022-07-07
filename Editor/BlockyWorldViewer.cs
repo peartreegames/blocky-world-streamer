@@ -1,13 +1,12 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Unity.EditorCoroutines.Editor;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
@@ -27,12 +26,19 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             window.Show();
         }
 
+        private static string GetScenePath(string sceneName)
+        {
+            var sceneGuids = AssetDatabase.FindAssets("t:Scene");
+            var guid = sceneGuids.FirstOrDefault(sceneGuid =>
+                AssetDatabase.LoadAssetAtPath<SceneAsset>(AssetDatabase.GUIDToAssetPath(sceneGuid))?.name == sceneName);
+            return guid == null ? null : AssetDatabase.GUIDToAssetPath(guid);
+        }
+
         private void OnEnable()
         {
             if (settings == null) CreateSettings();
-            EditorSceneManager.activeSceneChangedInEditMode += OnSceneHierarchyChanged;
-            EditorSceneManager.sceneOpened += OnSceneHierarchyChanged;
-            EditorSceneManager.sceneClosed += OnSceneHierarchyChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeChange;
+            Subscribe();
             rootVisualElement.styleSheets.Add(Resources.Load<StyleSheet>("BlockyWorldViewer"));
             serializedSettings = new SerializedObject(settings);
             var cameraMaskField = new PropertyField(serializedSettings.FindProperty("cameraMask"));
@@ -68,14 +74,15 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             {
                 if (settings.selected == null) return;
                 var sceneName = $"{settings.selected.reference.SceneName}_{settings.day:000}";
-                if (!SceneManager.GetSceneByName(sceneName).IsValid()) return;
+                var scenePath = GetScenePath(sceneName);
+                if (scenePath == null) return;
                 for (var i = 0; i < EditorSceneManager.loadedSceneCount; i++)
                 {
                     var openScene = SceneManager.GetSceneAt(i);
                     if (openScene.name.StartsWith(settings.selected.reference.SceneName) && openScene.name != settings.selected.reference.SceneName)
                         EditorSceneManager.CloseScene(openScene, true);
                 }
-                EditorSceneManager.OpenScene(sceneName);
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
             }) {text = "Open Day"};
             openDay.AddToClassList("grow");
             
@@ -83,7 +90,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             {
                 if (settings.selected == null) return;
                 var sceneName = $"{settings.selected.reference.SceneName}_{settings.day:000}";
-                if (SceneManager.GetSceneByName(sceneName).IsValid()) return;
+                var scenePath = GetScenePath(sceneName);
+                if (scenePath != null) return;
                 for (var i = 0; i < EditorSceneManager.loadedSceneCount; i++)
                 {
                     var scene = SceneManager.GetSceneAt(i);
@@ -92,7 +100,9 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 }
                 var newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
                 newScene.name = sceneName;
-                EditorSceneManager.SaveScene(newScene);
+                var path = $"Assets/Scenes/World/Days/{settings.day:000}/";
+                if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+                EditorSceneManager.SaveScene(newScene, $"{path}{newScene.name}.unity");
             }) {text = "New Day"};
             newDay.AddToClassList("grow");
             dayGroup.Add(openDay);
@@ -109,6 +119,27 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 EditorCoroutineUtility.StartCoroutineOwnerless(TakeAllScreenshots());
             }) {text = "Screenshot All Scene"});
             RefreshWorldGrid();
+        }
+
+        private void OnPlayModeChange(PlayModeStateChange state)
+        {
+            switch (state)
+            {
+                case PlayModeStateChange.ExitingEditMode:
+                    OnDisable();
+                    break;
+                case PlayModeStateChange.EnteredEditMode:
+                    Subscribe();
+                    break;
+            }
+        }
+
+
+        private void Subscribe()
+        {
+            EditorSceneManager.activeSceneChangedInEditMode += OnSceneHierarchyChanged;
+            EditorSceneManager.sceneOpened += OnSceneHierarchyChanged;
+            EditorSceneManager.sceneClosed += OnSceneHierarchyChanged;
         }
 
         private void OnDisable()
@@ -139,6 +170,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
         private void RefreshWorldGrid()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             var scroll = new ScrollView
             {
                 name = "Grid",
@@ -192,6 +224,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
         private void CreatePreviewButtons(VisualElement container)
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             var buttons = new List<Button>();
             var minX = int.MaxValue;
             var maxX = int.MinValue;

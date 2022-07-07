@@ -79,7 +79,8 @@ namespace PeartreeGames.BlockyWorldStreamer
                 {
                     colliderParent = new GameObject(LayerMask.LayerToName(col.gameObject.layer))
                     {
-                        layer = col.gameObject.layer
+                        layer = col.gameObject.layer,
+                        isStatic = true
                     };
                     colliderParent.transform.SetParent(collidersContainer.transform);
                     collidersByLayer.Add(col.gameObject.layer, colliderParent);
@@ -123,7 +124,6 @@ namespace PeartreeGames.BlockyWorldStreamer
 
             collidersContainer.transform.position = originalPos;
             obj.transform.position = originalPos;
-            obj.SetActive(false);
             return collidersContainer;
         }
 

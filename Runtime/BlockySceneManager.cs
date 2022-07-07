@@ -141,7 +141,7 @@ namespace PeartreeGames.BlockyWorldStreamer
         {
             _isLoading = true;
             var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
-            if (SceneManager.GetSceneByName(sceneName).isLoaded) goto loadDay;
+            if (SceneManager.GetSceneByName(sceneName).isLoaded || _loadedScenes.ContainsKey(cell)) goto loadDay;
 
             var key = Addressables.LoadResourceLocationsAsync(sceneName);
             while (!key.IsDone) yield return null;
@@ -151,18 +151,17 @@ namespace PeartreeGames.BlockyWorldStreamer
             if (!loadAo.IsValid()) goto complete;
 
             while (!loadAo.IsDone) yield return null;
-            _loadedScenes.Add(cell, loadAo.Result);
+            _loadedScenes.TryAdd(cell, loadAo.Result);
             yield return new WaitForSeconds(0.2f);
             
             loadDay:
-            var daySceneName = $"{sceneName}_{dayObject.Value:000}";
+            var day = $"{dayObject.Value:000}";
+            var daySceneName = $"{sceneName}_{day}";
             if (SceneManager.GetSceneByName(daySceneName).isLoaded) goto complete;
-            
-            var dayKey = Addressables.LoadResourceLocationsAsync(sceneName);
+            var dayKey = Addressables.LoadResourceLocationsAsync(daySceneName);
             while (!dayKey.IsDone) yield return null;
             if (dayKey.Result.Count == 0) goto complete;
-
-            var dayLoadAo = Addressables.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            var dayLoadAo = Addressables.LoadSceneAsync(daySceneName, LoadSceneMode.Additive);
             if (!dayLoadAo.IsValid()) goto complete;
             
 
