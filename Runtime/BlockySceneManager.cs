@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 
 namespace PeartreeGames.BlockyWorldStreamer
 {
+    [DefaultExecutionOrder(-100)]
     public class BlockySceneManager : MonoBehaviour
     {
         [SerializeField] private EvtTransformObject target;
@@ -20,6 +21,8 @@ namespace PeartreeGames.BlockyWorldStreamer
         public List<EvtBoolObject> readyObjects;
 
         public static readonly EvtEvent OnWorldSceneReady = new();
+        public static bool DaySceneReadyToLoad { get; set; }
+
         private Vector2Int CurrentCell { get; set; }
         private Vector2Int NextCell { get; set; }
 
@@ -32,11 +35,45 @@ namespace PeartreeGames.BlockyWorldStreamer
 
         private void Awake()
         {
+            DaySceneReadyToLoad = false;
 #if !DEVELOPMENT_BUILD && !UNITY_EDITOR
             quickLoad = false;
 #endif
+            
+#if UNITY_EDITOR
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var scene = SceneManager.GetSceneAt(i);
+                if (scene.name.StartsWith(BlockyWorldUtilities.ScenePrefix))
+                    SceneManager.UnloadSceneAsync(scene);
+            }
+#endif
             _actions = new List<BlockySceneAction>();
             _loadedScenes = new Dictionary<Vector2Int, SceneInstance>();
+        }
+
+        private void OnLoadDays()
+        {
+            
+        }
+
+        private IEnumerator Start()
+        {
+            enabled = false;
+            while (target.Value == null) yield return null;
+            SceneManager.SetActiveScene(gameObject.scene);
+            
+            CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
+
+            yield return LoadSceneCell(CurrentCell);
+            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad)
+            {
+                if (quickLoad) StartCoroutine(LoadSceneCell(load));
+                else yield return LoadSceneCell(load);
+            }
+            if (!quickLoad) while (!readyObjects.TrueForAll(obj => obj.Value)) yield return null;
+            enabled = true;
+            OnWorldSceneReady?.Invoke();
         }
 
         private void Update()
@@ -60,32 +97,7 @@ namespace PeartreeGames.BlockyWorldStreamer
             _actions.Remove(next);
         }
 
-        private IEnumerator Start()
-        {
-            enabled = false;
-            while (target.Value == null) yield return null;
-#if UNITY_EDITOR
-            for (var i = 0; i < SceneManager.sceneCount; i++)
-            {
-                var scene = SceneManager.GetSceneAt(i);
-                if (scene.name.StartsWith(BlockyWorldUtilities.ScenePrefix))
-                    yield return SceneManager.UnloadSceneAsync(scene);
-            }
-#endif
-            SceneManager.SetActiveScene(gameObject.scene);
-            
-            CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
 
-            yield return LoadSceneCell(CurrentCell);
-            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad)
-            {
-                if (quickLoad) StartCoroutine(LoadSceneCell(load));
-                else yield return LoadSceneCell(load);
-            }
-            if (!quickLoad) while (!readyObjects.TrueForAll(obj => obj.Value)) yield return null;
-            enabled = true;
-            OnWorldSceneReady?.Invoke();
-        }
 
         public void RequestSceneLoad(Vector2Int cell)
         {
@@ -155,6 +167,12 @@ namespace PeartreeGames.BlockyWorldStreamer
             yield return new WaitForSeconds(0.2f);
             
             loadDay:
+            if (!DaySceneReadyToLoad)
+            {
+                var action = new BlockySceneAction(cell, LoadSceneCell, 10);
+                _actions.Add(action);
+                goto complete;
+            }
             var day = $"{dayObject.Value:000}";
             var daySceneName = $"{sceneName}_{day}";
             if (SceneManager.GetSceneByName(daySceneName).isLoaded) goto complete;
@@ -164,7 +182,6 @@ namespace PeartreeGames.BlockyWorldStreamer
             var dayLoadAo = Addressables.LoadSceneAsync(daySceneName, LoadSceneMode.Additive);
             if (!dayLoadAo.IsValid()) goto complete;
             
-
             while (!dayLoadAo.IsDone) yield return null;
             
             complete:

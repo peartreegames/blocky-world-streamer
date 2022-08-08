@@ -1,9 +1,11 @@
 ﻿using System;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
-namespace PeartreeGames.BlockyWorldStreamer.Editor
+namespace PeartreeGames.BlockyWorldStreamer
 {
     [Serializable]
     public class BlockySceneReference : AssetReference, IEquatable<BlockySceneReference>
@@ -63,9 +65,6 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             return obj.GetType() == GetType() && Equals((BlockySceneReference) obj);
         }
 
-        public override int GetHashCode()
-        {
-            return sceneName != null ? sceneName.GetHashCode() : 0;
-        }
+        public override int GetHashCode() => sceneName != null ? sceneName.GetHashCode() : 0;
     }
 }

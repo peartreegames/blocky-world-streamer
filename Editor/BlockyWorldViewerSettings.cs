@@ -17,7 +17,6 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         public LayerMask cameraMask;
         public int day;
         public List<Scene> scenes;
-        [HideInInspector]
-        public Scene selected;
+        [NonSerialized] public Scene Selected;
     }
 }
