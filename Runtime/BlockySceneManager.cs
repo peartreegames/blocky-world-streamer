@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using PeartreeGames.EvtVariables;
+using PeartreeGames.Evt.Variables;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.ResourceProviders;
@@ -12,13 +12,13 @@ namespace PeartreeGames.BlockyWorldStreamer
     [DefaultExecutionOrder(-100)]
     public class BlockySceneManager : MonoBehaviour
     {
-        [SerializeField] private EvtTransformObject target;
+        [SerializeField] private EvtTransform target;
         [SerializeField] private float loadDelay = 2f;
         [SerializeField] private bool debug;
         [SerializeField] private bool quickLoad;
-        [SerializeField] private EvtIntObject dayObject;
+        [SerializeField] private EvtInt dayObject;
 
-        public List<EvtBoolObject> readyObjects;
+        public List<EvtBool> readyObjects;
 
         public static readonly EvtEvent OnWorldSceneReady = new();
         public static bool DaySceneReadyToLoad { get; set; }
@@ -39,12 +39,12 @@ namespace PeartreeGames.BlockyWorldStreamer
 #if !DEVELOPMENT_BUILD && !UNITY_EDITOR
             quickLoad = false;
 #endif
-            
+
 #if UNITY_EDITOR
             for (var i = 0; i < SceneManager.sceneCount; i++)
             {
                 var scene = SceneManager.GetSceneAt(i);
-                if (scene.name.StartsWith(BlockyWorldUtilities.ScenePrefix))
+                if (BlockyWorldUtilities.WorldSceneRegex.IsMatch(scene.name))
                     SceneManager.UnloadSceneAsync(scene);
             }
 #endif
@@ -52,17 +52,12 @@ namespace PeartreeGames.BlockyWorldStreamer
             _loadedScenes = new Dictionary<Vector2Int, SceneInstance>();
         }
 
-        private void OnLoadDays()
-        {
-            
-        }
-
         private IEnumerator Start()
         {
             enabled = false;
             while (target.Value == null) yield return null;
             SceneManager.SetActiveScene(gameObject.scene);
-            
+
             CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
 
             yield return LoadSceneCell(CurrentCell);
@@ -71,7 +66,19 @@ namespace PeartreeGames.BlockyWorldStreamer
                 if (quickLoad) StartCoroutine(LoadSceneCell(load));
                 else yield return LoadSceneCell(load);
             }
-            if (!quickLoad) while (!readyObjects.TrueForAll(obj => obj.Value)) yield return null;
+
+            if (!quickLoad)
+            {
+                while (!readyObjects.TrueForAll(obj => obj.Value))
+                {
+                    Debug.LogWarning(
+                        "[BlockySceneManager#Start] Waiting on ReadyObject " +
+                        $"{string.Join(',', readyObjects.Where(r => !r.Value).Select(r => r.name))}");
+                }
+
+                yield return null;
+            }
+
             enabled = true;
             OnWorldSceneReady?.Invoke();
         }
@@ -96,7 +103,6 @@ namespace PeartreeGames.BlockyWorldStreamer
             StartCoroutine(_loadingCoroutine.co);
             _actions.Remove(next);
         }
-
 
 
         public void RequestSceneLoad(Vector2Int cell)
@@ -165,7 +171,7 @@ namespace PeartreeGames.BlockyWorldStreamer
             while (!loadAo.IsDone) yield return null;
             _loadedScenes.TryAdd(cell, loadAo.Result);
             yield return new WaitForSeconds(0.2f);
-            
+
             loadDay:
             if (!DaySceneReadyToLoad)
             {
@@ -173,6 +179,7 @@ namespace PeartreeGames.BlockyWorldStreamer
                 _actions.Add(action);
                 goto complete;
             }
+
             var day = $"{dayObject.Value:000}";
             var daySceneName = $"{sceneName}_{day}";
             if (SceneManager.GetSceneByName(daySceneName).isLoaded) goto complete;
@@ -181,9 +188,9 @@ namespace PeartreeGames.BlockyWorldStreamer
             if (dayKey.Result.Count == 0) goto complete;
             var dayLoadAo = Addressables.LoadSceneAsync(daySceneName, LoadSceneMode.Additive);
             if (!dayLoadAo.IsValid()) goto complete;
-            
+
             while (!dayLoadAo.IsDone) yield return null;
-            
+
             complete:
             _isLoading = false;
         }

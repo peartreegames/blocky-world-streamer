@@ -43,8 +43,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         {
             yield return new EditorWaitForSeconds(0.5f);
             if (SceneManager.sceneCount == 0) yield break;
-            while (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) yield return null;
-            if (settings == null) CreateSettings();
+            while (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) yield return null;
+            if (settings == null) GetOrCreateSettings();
             EditorApplication.playModeStateChanged += OnPlayModeChange;
             Subscribe();
             rootVisualElement.styleSheets.Add(Resources.Load<StyleSheet>("BlockyWorldViewer"));
@@ -84,7 +84,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 var sceneName = $"{settings.Selected.reference.SceneName}_{settings.day:000}";
                 var scenePath = GetScenePath(sceneName);
                 if (scenePath == null) return;
-                for (var i = 0; i < EditorSceneManager.loadedSceneCount; i++)
+                for (var i = 0; i < SceneManager.loadedSceneCount; i++)
                 {
                     var openScene = SceneManager.GetSceneAt(i);
                     if (openScene.name.StartsWith(settings.Selected.reference.SceneName) &&
@@ -102,7 +102,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 var sceneName = $"{settings.Selected.reference.SceneName}_{settings.day:000}";
                 var scenePath = GetScenePath(sceneName);
                 if (scenePath != null) return;
-                for (var i = 0; i < EditorSceneManager.loadedSceneCount; i++)
+                for (var i = 0; i < SceneManager.loadedSceneCount; i++)
                 {
                     var scene = SceneManager.GetSceneAt(i);
                     if (scene.name.StartsWith(settings.Selected.reference.SceneName) &&
@@ -123,8 +123,9 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
             rootVisualElement.Add(new Button(() =>
             {
-                EditorCoroutineUtility.StartCoroutineOwnerless(TakeScreenshot(SceneManager.GetActiveScene()));
-            }) {text = "Screenshot Active Scene"});
+                if (settings.Selected == null) return;
+                EditorCoroutineUtility.StartCoroutineOwnerless(TakeScreenshot(SceneManager.GetSceneByPath(settings.Selected.reference.ScenePath)));
+            }) {text = "Screenshot Selected Scene"});
             RefreshWorldGrid();
         }
 
@@ -165,12 +166,14 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         private void OnSceneHierarchyChanged(Scene scene, OpenSceneMode mode) => OnSceneHierarchyChanged(scene);
         private void OnSceneHierarchyChanged(Scene current, Scene next) => RefreshWorldGrid();
 
-        private void CreateSettings()
+        private void GetOrCreateSettings()
         {
             var assets = AssetDatabase.FindAssets($"t:{typeof(BlockyWorldViewerSettings)}");
             if (assets.Length > 0)
+            {
                 settings = AssetDatabase.LoadAssetAtPath<BlockyWorldViewerSettings>(
                     AssetDatabase.GUIDToAssetPath(assets[0]));
+            }
             else
             {
                 settings = CreateInstance<BlockyWorldViewerSettings>();
@@ -178,11 +181,32 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 settings.cameraMask = -1;
                 AssetDatabase.CreateAsset(settings, "Assets/BlockyWorldViewerSettings.asset");
             }
+
+            var worldScenes = AssetDatabase.FindAssets("t:Scene")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Select(AssetDatabase.LoadAssetAtPath<SceneAsset>)
+                .Where(s => BlockyWorldUtilities.WorldSceneRegex.IsMatch(s.name))
+                .ToList();
+            foreach (var s in worldScenes)
+            {
+                var key = BlockyWorldUtilities.GetCellFromSceneName(s.name);
+                if (settings.scenes.Exists(scene => scene.key == key))
+                    continue;
+                settings.scenes.Add(new BlockyWorldViewerSettings.Scene
+                {
+                    reference = new BlockySceneReference(s),
+                    key = key,
+                    texture = null
+                });
+            }
         }
 
         private void RefreshWorldGrid()
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) return;
+            var prev = rootVisualElement.Q("Grid");
+            if (prev != null) rootVisualElement.Remove(prev);
+            
+            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             var scroll = new ScrollView
             {
                 name = "Grid",
@@ -190,22 +214,18 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible
             };
             scroll.AddToClassList("preview-scroll");
-            var prev = rootVisualElement.Q("Grid");
-            if (prev != null) rootVisualElement.Remove(prev);
-
+            
             var container = new GroupBox();
             container.AddToClassList("preview-container");
             scroll.Add(container);
             rootVisualElement.Insert(5, scroll);
             CreatePreviewButtons(container);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
             container.MarkDirtyRepaint();
         }
 
         private void CreatePreviewButtons(VisualElement container)
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             var buttons = new List<Button>();
             var minX = int.MaxValue;
             var maxX = int.MinValue;
@@ -289,7 +309,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 yield break;
             }
 
-            if (settings == null) CreateSettings();
+            if (settings == null) GetOrCreateSettings();
 
             yield return new EditorWaitForSeconds(0.1f);
             Undo.RecordObject(settings, "Checked Scene Viewer");

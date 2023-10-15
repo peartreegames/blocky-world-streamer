@@ -3,7 +3,7 @@
   "rootNamespace": "PeartreeGames.BlockyWorldStreamer",
   "references": [
     "PeartreeGames.BlockyWorldEditor",
-    "PeartreeGames.EvtVariables",
+    "PeartreeGames.Evt.Variables",
     "Unity.Addressables",
     "Unity.ResourceManager"
   ],

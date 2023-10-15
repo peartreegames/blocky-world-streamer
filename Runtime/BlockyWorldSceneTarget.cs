@@ -1,12 +1,12 @@
 ﻿using System;
-using PeartreeGames.EvtVariables;
+using PeartreeGames.Evt.Variables;
 using UnityEngine;
 
 namespace PeartreeGames.BlockyWorldStreamer
 {
     public class BlockyWorldSceneTarget : MonoBehaviour
     {
-        [SerializeField] private EvtTransformObject target;
+        [SerializeField] private EvtTransform target;
 
         private void Awake()
         {

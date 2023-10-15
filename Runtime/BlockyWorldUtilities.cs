@@ -14,6 +14,8 @@ namespace PeartreeGames.BlockyWorldStreamer
         public const int SceneGridSize = 100;
         public const int SceneQuadSize = 50;
         public static float SceneQuadExtents => SceneQuadSize / 2f;
+        public static readonly Regex WorldSceneRegex = new(@"^world_.*\)$");
+        public static readonly Regex DaySceneRegex = new(@"^world_.*\)_\d*$");
 
         public static List<Vector2Int> GetNeighbouringCells(Vector2Int pos)
         {

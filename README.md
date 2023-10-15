@@ -4,7 +4,7 @@ Code from "Creating a 3D Tilemap Editor and World Builder in Unity - Part 4" [Yo
 ## Installation
 Can be installed via the Package Manager > Add Package From Git URL...
 
-This repo has a dependency on the BlockyWorldEditor and EvtVariables package which *MUST* be installed first. (From my understanding Unity does not allow git urls to be used as dependencies of packages)
+This repo has a dependency on the BlockyWorldEditor and Evt.Variables package which *MUST* be installed first. (From my understanding Unity does not allow git urls to be used as dependencies of packages)
 
 `https://github.com/peartreegames/blocky-world-editor.git`
 `https://github.com/peartreegames/evt-variables.git`
