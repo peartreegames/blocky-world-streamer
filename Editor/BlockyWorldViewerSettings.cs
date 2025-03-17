@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace PeartreeGames.Blocky.WorldStreamer.Editor
+namespace PeartreeGames.Blocky.Streamer.Editor
 {
     public class BlockyWorldViewerSettings : ScriptableObject
     {

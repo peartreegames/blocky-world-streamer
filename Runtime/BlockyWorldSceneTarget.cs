@@ -3,7 +3,7 @@ using PeartreeGames.Evt.Variables;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     public class BlockyWorldSceneTarget : MonoBehaviour
     {

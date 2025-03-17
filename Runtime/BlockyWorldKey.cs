@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     [CreateAssetMenu(fileName = "bWorld_", menuName = "Blocky/World Key", order = 0)]
     public class BlockyWorldKey : ScriptableObject

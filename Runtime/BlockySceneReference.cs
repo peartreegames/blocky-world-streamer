@@ -5,7 +5,7 @@ using UnityEngine.AddressableAssets;
 #if UNITY_EDITOR
 #endif
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     [Serializable]
     public class BlockySceneReference : AssetReference, IEquatable<BlockySceneReference>

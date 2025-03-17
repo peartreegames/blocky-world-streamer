@@ -1,8 +1,8 @@
 ﻿{
-  "name": "PeartreeGames.Blocky.WorldStreamer",
-  "rootNamespace": "PeartreeGames.Blocky.WorldStreamer",
+  "name": "PeartreeGames.Blocky.Streamer",
+  "rootNamespace": "PeartreeGames.Blocky.Streamer",
   "references": [
-    "PeartreeGames.Blocky.WorldEditor",
+    "PeartreeGames.Blocky.World",
     "PeartreeGames.Evt.Variables",
     "Unity.Addressables",
     "Unity.ResourceManager"

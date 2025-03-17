@@ -2,7 +2,7 @@
 using System.Collections;
 using UnityEngine;
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     public readonly struct BlockySceneAction : IComparable<BlockySceneAction>, IEquatable<BlockySceneAction>
     {

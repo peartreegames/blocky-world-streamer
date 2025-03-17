@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     public class BlockyRectangle
     {

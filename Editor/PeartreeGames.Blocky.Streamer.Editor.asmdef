@@ -1,10 +1,10 @@
 ﻿{
-  "name": "PeartreeGames.Blocky.WorldStreamer.Editor",
-  "rootNamespace": "PeartreeGames.Blocky.WorldStreamer.Editor",
+  "name": "PeartreeGames.Blocky.Streamer.Editor",
+  "rootNamespace": "PeartreeGames.Blocky.Streamer.Editor",
   "references": [
-    "PeartreeGames.Blocky.WorldEditor",
-    "PeartreeGames.Blocky.WorldEditor.Editor",
-    "PeartreeGames.Blocky.WorldStreamer",
+    "PeartreeGames.Blocky.World",
+    "PeartreeGames.Blocky.World.Editor",
+    "PeartreeGames.Blocky.Streamer",
     "Unity.Addressables",
     "Unity.Addressables.Editor",
     "Unity.ResourceManager",

@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using PeartreeGames.Blocky.WorldEditor;
+using PeartreeGames.Blocky.World;
 using PeartreeGames.Evt.Variables;
 using UnityEditor;
 using UnityEngine;
@@ -11,7 +11,7 @@ using UnityEngine.ResourceManagement.ResourceProviders;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     [DefaultExecutionOrder(-10000)]
     public class BlockySceneManager : MonoBehaviour

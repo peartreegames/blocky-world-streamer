@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using PeartreeGames.Blocky.WorldEditor;
-using PeartreeGames.Blocky.WorldEditor.Editor.Attributes;
-using PeartreeGames.Blocky.WorldEditor.Editor.BlockyParentSetter;
+using PeartreeGames.Blocky.World;
+using PeartreeGames.Blocky.World.Editor.Attributes;
+using PeartreeGames.Blocky.World.Editor.BlockyParentSetter;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
@@ -13,9 +13,9 @@ using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Random = UnityEngine.Random;
 
-namespace PeartreeGames.Blocky.WorldStreamer.Editor
+namespace PeartreeGames.Blocky.Streamer.Editor
 {
-    public class BlockyWorldStreamerParentSetter : BlockyParentSetter
+    public class BlockyStreamerParentSetter : BlockyParentSetter
     {
         [SerializeField] private BlockyWorldKey worldKey;
         [SerializeField] private bool randomHeight;

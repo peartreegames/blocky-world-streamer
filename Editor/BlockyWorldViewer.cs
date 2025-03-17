@@ -9,7 +9,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
-namespace PeartreeGames.Blocky.WorldStreamer.Editor
+namespace PeartreeGames.Blocky.Streamer.Editor
 {
     public class BlockyWorldViewer : EditorWindow
     {

@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using PeartreeGames.Blocky.WorldEditor;
+using PeartreeGames.Blocky.World;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace PeartreeGames.Blocky.WorldStreamer
+namespace PeartreeGames.Blocky.Streamer
 {
     public static class BlockyWorldUtilities
     {

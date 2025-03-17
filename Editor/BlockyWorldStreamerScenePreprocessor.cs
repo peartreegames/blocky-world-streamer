@@ -1,10 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using PeartreeGames.Blocky.WorldEditor.Editor;
+using PeartreeGames.Blocky.World.Editor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace PeartreeGames.Blocky.WorldStreamer.Editor
+namespace PeartreeGames.Blocky.Streamer.Editor
 {
     public class BlockyWorldStreamerScenePreprocessor : IBlockyScenePreprocessor
     {
@@ -12,7 +12,7 @@ namespace PeartreeGames.Blocky.WorldStreamer.Editor
 
         public void ProcessScene(BlockyEditorWindow window, Scene scene)
         {
-            var mapParent = BlockyWorldStreamerParentSetter.GetMapParent(scene, "Map");
+            var mapParent = BlockyStreamerParentSetter.GetMapParent(scene, "Map");
             if (mapParent == null) return;
             ProcessObject(mapParent);
         }
@@ -33,7 +33,7 @@ namespace PeartreeGames.Blocky.WorldStreamer.Editor
 
         public static void RevertScene(Scene scene)
         {
-            var mapParent = BlockyWorldStreamerParentSetter.GetMapParent(scene, "Map");
+            var mapParent = BlockyStreamerParentSetter.GetMapParent(scene, "Map");
             if (mapParent == null) return;
             RevertObject(mapParent);
         }
