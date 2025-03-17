@@ -1,6 +1,5 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Unity.EditorCoroutines.Editor;
 using UnityEditor;
@@ -10,13 +9,13 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
-namespace PeartreeGames.BlockyWorldStreamer.Editor
+namespace PeartreeGames.Blocky.WorldStreamer.Editor
 {
     public class BlockyWorldViewer : EditorWindow
     {
         private const int Size = 512;
+        [SerializeField] private SceneAsset overworldScene;
         [SerializeField] private BlockyWorldViewerSettings settings;
-        private SerializedObject serializedSettings;
 
         [MenuItem("Tools/Blocky/WorldViewer")]
         private static void ShowWindow()
@@ -30,7 +29,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         {
             var sceneGuids = AssetDatabase.FindAssets("t:Scene");
             var guid = sceneGuids.FirstOrDefault(sceneGuid =>
-                AssetDatabase.LoadAssetAtPath<SceneAsset>(AssetDatabase.GUIDToAssetPath(sceneGuid))?.name == sceneName);
+                AssetDatabase.LoadAssetAtPath<SceneAsset>(AssetDatabase.GUIDToAssetPath(sceneGuid))
+                    ?.name == sceneName);
             return guid == null ? null : AssetDatabase.GUIDToAssetPath(guid);
         }
 
@@ -43,89 +43,61 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         {
             yield return new EditorWaitForSeconds(0.5f);
             if (SceneManager.sceneCount == 0) yield break;
-            while (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling) yield return null;
-            if (settings == null) GetOrCreateSettings();
+            while (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode ||
+                   EditorApplication.isCompiling) yield return null;
             EditorApplication.playModeStateChanged += OnPlayModeChange;
             Subscribe();
             rootVisualElement.styleSheets.Add(Resources.Load<StyleSheet>("BlockyWorldViewer"));
-            serializedSettings = new SerializedObject(settings);
-            var cameraMaskField = new PropertyField(serializedSettings.FindProperty("cameraMask"));
-            cameraMaskField.Bind(serializedSettings);
-            rootVisualElement.Add(cameraMaskField);
-            var dayField = new PropertyField(serializedSettings.FindProperty("day"));
-            dayField.Bind(serializedSettings);
-            rootVisualElement.Add(dayField);
+
+            var overworld = new ObjectField("Overworld")
+            {
+                objectType = typeof(SceneAsset),
+                value = overworldScene
+            };
+            overworld.RegisterValueChangedCallback(v => overworldScene = (SceneAsset)v.newValue);
+            rootVisualElement.Add(overworld);
+            
+            var field = new ObjectField("Settings")
+            {
+               objectType = typeof(BlockyWorldViewerSettings),
+               value = settings
+            };
+            field.RegisterValueChangedCallback(v => settings = (BlockyWorldViewerSettings)v.newValue);
+            rootVisualElement.Add(field);
 
             var openGroup = new GroupBox();
             openGroup.AddToClassList("horizontal");
             var single = new Button(() =>
             {
                 if (settings.Selected == null) return;
-                EditorSceneManager.OpenScene(settings.Selected.reference.ScenePath, OpenSceneMode.Single);
+                EditorSceneManager.SaveOpenScenes();
+                var scene = EditorSceneManager.OpenScene(settings.Selected.reference.ScenePath, OpenSceneMode.Single);
+                EditorSceneManager.OpenScene(AssetDatabase.GetAssetPath(overworldScene), OpenSceneMode.Additive);
+                SceneManager.SetActiveScene(scene);
                 RefreshWorldGrid();
-            }) {text = "Open Scene Single"};
+            }) { text = "Open Scene Single" };
             single.AddToClassList("grow");
             openGroup.Add(single);
             var add = new Button(() =>
             {
                 if (settings.Selected == null) return;
-                EditorSceneManager.OpenScene(settings.Selected.reference.ScenePath, OpenSceneMode.Additive);
+                EditorSceneManager.OpenScene(settings.Selected.reference.ScenePath,
+                    OpenSceneMode.Additive);
                 RefreshWorldGrid();
-            }) {text = "Open Scene Additive"};
+            }) { text = "Open Scene Additive" };
             add.AddToClassList("grow");
             openGroup.Add(add);
             rootVisualElement.Add(openGroup);
-
-            var dayGroup = new GroupBox();
-            dayGroup.AddToClassList("horizontal");
-            var openDay = new Button(() =>
-            {
-                if (settings.Selected == null) return;
-                var sceneName = $"{settings.Selected.reference.SceneName}_{settings.day:000}";
-                var scenePath = GetScenePath(sceneName);
-                if (scenePath == null) return;
-                for (var i = 0; i < SceneManager.loadedSceneCount; i++)
-                {
-                    var openScene = SceneManager.GetSceneAt(i);
-                    if (openScene.name.StartsWith(settings.Selected.reference.SceneName) &&
-                        openScene.name != settings.Selected.reference.SceneName)
-                        EditorSceneManager.CloseScene(openScene, true);
-                }
-
-                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
-            }) {text = "Open Day"};
-            openDay.AddToClassList("grow");
-
-            var newDay = new Button(() =>
-            {
-                if (settings.Selected == null) return;
-                var sceneName = $"{settings.Selected.reference.SceneName}_{settings.day:000}";
-                var scenePath = GetScenePath(sceneName);
-                if (scenePath != null) return;
-                for (var i = 0; i < SceneManager.loadedSceneCount; i++)
-                {
-                    var scene = SceneManager.GetSceneAt(i);
-                    if (scene.name.StartsWith(settings.Selected.reference.SceneName) &&
-                        scene.name != settings.Selected.reference.SceneName)
-                        EditorSceneManager.CloseScene(scene, true);
-                }
-
-                var newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
-                newScene.name = sceneName;
-                var path = $"Assets/Scenes/World/Days/{settings.day:000}/";
-                if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-                EditorSceneManager.SaveScene(newScene, $"{path}{newScene.name}.unity");
-            }) {text = "New Day"};
-            newDay.AddToClassList("grow");
-            dayGroup.Add(openDay);
-            dayGroup.Add(newDay);
-            rootVisualElement.Add(dayGroup);
-
             rootVisualElement.Add(new Button(() =>
             {
                 if (settings.Selected == null) return;
-                EditorCoroutineUtility.StartCoroutineOwnerless(TakeScreenshot(SceneManager.GetSceneByPath(settings.Selected.reference.ScenePath)));
-            }) {text = "Screenshot Selected Scene"});
+                EditorCoroutineUtility.StartCoroutineOwnerless(
+                    TakeScreenshot(
+                        SceneManager.GetSceneByPath(settings.Selected.reference.ScenePath)));
+            }) { text = "Screenshot Selected Scene" });
+
+            var refresh = new Button(RefreshWorldGrid) { text = "Refresh" };
+            rootVisualElement.Add(refresh);
             RefreshWorldGrid();
         }
 
@@ -163,50 +135,20 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
         }
 
         private void OnSceneHierarchyChanged(Scene scene) => RefreshWorldGrid();
-        private void OnSceneHierarchyChanged(Scene scene, OpenSceneMode mode) => OnSceneHierarchyChanged(scene);
+
+        private void OnSceneHierarchyChanged(Scene scene, OpenSceneMode mode) =>
+            OnSceneHierarchyChanged(scene);
+
         private void OnSceneHierarchyChanged(Scene current, Scene next) => RefreshWorldGrid();
-
-        private void GetOrCreateSettings()
-        {
-            var assets = AssetDatabase.FindAssets($"t:{typeof(BlockyWorldViewerSettings)}");
-            if (assets.Length > 0)
-            {
-                settings = AssetDatabase.LoadAssetAtPath<BlockyWorldViewerSettings>(
-                    AssetDatabase.GUIDToAssetPath(assets[0]));
-            }
-            else
-            {
-                settings = CreateInstance<BlockyWorldViewerSettings>();
-                settings.scenes = new List<BlockyWorldViewerSettings.Scene>();
-                settings.cameraMask = -1;
-                AssetDatabase.CreateAsset(settings, "Assets/BlockyWorldViewerSettings.asset");
-            }
-
-            var worldScenes = AssetDatabase.FindAssets("t:Scene")
-                .Select(AssetDatabase.GUIDToAssetPath)
-                .Select(AssetDatabase.LoadAssetAtPath<SceneAsset>)
-                .Where(s => BlockyWorldUtilities.WorldSceneRegex.IsMatch(s.name))
-                .ToList();
-            foreach (var s in worldScenes)
-            {
-                var key = BlockyWorldUtilities.GetCellFromSceneName(s.name);
-                if (settings.scenes.Exists(scene => scene.key == key))
-                    continue;
-                settings.scenes.Add(new BlockyWorldViewerSettings.Scene
-                {
-                    reference = new BlockySceneReference(s),
-                    key = key,
-                    texture = null
-                });
-            }
-        }
 
         private void RefreshWorldGrid()
         {
+            if (settings == null || settings.worldKey == null) return;
             var prev = rootVisualElement.Q("Grid");
             if (prev != null) rootVisualElement.Remove(prev);
-            
-            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+
+            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode ||
+                EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             var scroll = new ScrollView
             {
                 name = "Grid",
@@ -214,18 +156,19 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible
             };
             scroll.AddToClassList("preview-scroll");
-            
+
             var container = new GroupBox();
             container.AddToClassList("preview-container");
             scroll.Add(container);
-            rootVisualElement.Insert(5, scroll);
+            rootVisualElement.Insert(4, scroll);
             CreatePreviewButtons(container);
             container.MarkDirtyRepaint();
         }
 
         private void CreatePreviewButtons(VisualElement container)
         {
-            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            if (Application.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode ||
+                EditorApplication.isCompiling || EditorApplication.isUpdating) return;
             var buttons = new List<Button>();
             var minX = int.MaxValue;
             var maxX = int.MinValue;
@@ -256,12 +199,13 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                     button.AddToClassList("preview");
                     if (viewer != null)
                     {
-                        if (active == viewer.reference.SceneName) button.AddToClassList("preview-active");
+                        if (active == viewer.reference.SceneName)
+                            button.AddToClassList("preview-active");
                         else if (SceneManager.GetSceneByName(viewer.reference.SceneName).isLoaded)
                             button.AddToClassList("preview-loaded");
 
                         if (viewer == settings.Selected) button.AddToClassList("preview-selected");
-                        var img = new Image {image = viewer.texture};
+                        var img = new Image { image = viewer.texture };
                         img.AddToClassList("preview-image");
                         button.Add(img);
                         var label = new Label(viewer.key.ToString());
@@ -280,9 +224,11 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 foreach (var btn in buttons)
                 {
                     btn.RemoveFromClassList("preview-selected");
-                    var sceneName = (btn.userData as BlockyWorldViewerSettings.Scene)?.reference.SceneName;
+                    var sceneName = (btn.userData as BlockyWorldViewerSettings.Scene)?.reference
+                        .SceneName;
                     if (active == sceneName) btn.AddToClassList("preview-active");
-                    else if (SceneManager.GetSceneByName(sceneName).isLoaded) btn.AddToClassList("preview-loaded");
+                    else if (SceneManager.GetSceneByName(sceneName).isLoaded)
+                        btn.AddToClassList("preview-loaded");
                 }
 
                 if (settings.Selected == button?.userData) settings.Selected = null;
@@ -308,9 +254,6 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 Debug.LogWarning($"{scene.name} is not valid");
                 yield break;
             }
-
-            if (settings == null) GetOrCreateSettings();
-
             yield return new EditorWaitForSeconds(0.1f);
             Undo.RecordObject(settings, "Checked Scene Viewer");
             var key = BlockyWorldUtilities.GetCellFromSceneName(scene.name);
@@ -322,7 +265,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
             }
 
             viewerScene.key = key;
-            viewerScene.reference = new BlockySceneReference(AssetDatabase.LoadAssetAtPath<SceneAsset>(scene.path));
+            viewerScene.reference =
+                new BlockySceneReference(AssetDatabase.LoadAssetAtPath<SceneAsset>(scene.path));
             var texture = new Texture2D(Size, Size, TextureFormat.ARGB32, false)
             {
                 name = scene.name
@@ -340,7 +284,8 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color();
-            cam.transform.position = new Vector3(BlockyWorldUtilities.SceneGridSize * key.x + 0.5f, 500,
+            cam.transform.position = new Vector3(BlockyWorldUtilities.SceneGridSize * key.x + 0.5f,
+                500,
                 BlockyWorldUtilities.SceneGridSize * key.y + 0.5f);
             cam.transform.rotation = Quaternion.Euler(90, 0, 0);
 

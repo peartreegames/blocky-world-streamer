@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace PeartreeGames.BlockyWorldStreamer.Editor
+namespace PeartreeGames.Blocky.WorldStreamer.Editor
 {
     public class BlockyWorldSceneProcessor : IProcessSceneWithReport
     {

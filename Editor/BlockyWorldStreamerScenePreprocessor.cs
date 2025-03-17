@@ -1,10 +1,10 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using PeartreeGames.BlockyWorldEditor.Editor;
+using PeartreeGames.Blocky.WorldEditor.Editor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace PeartreeGames.BlockyWorldStreamer.Editor
+namespace PeartreeGames.Blocky.WorldStreamer.Editor
 {
     public class BlockyWorldStreamerScenePreprocessor : IBlockyScenePreprocessor
     {

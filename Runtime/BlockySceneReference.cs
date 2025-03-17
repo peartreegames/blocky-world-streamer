@@ -1,11 +1,11 @@
 ﻿using System;
-#if UNITY_EDITOR
 using UnityEditor;
-#endif
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+#if UNITY_EDITOR
+#endif
 
-namespace PeartreeGames.BlockyWorldStreamer
+namespace PeartreeGames.Blocky.WorldStreamer
 {
     [Serializable]
     public class BlockySceneReference : AssetReference, IEquatable<BlockySceneReference>
@@ -30,7 +30,11 @@ namespace PeartreeGames.BlockyWorldStreamer
 
         public override bool ValidateAsset(UnityEngine.Object obj)
         {
-            return obj != null && obj is SceneAsset;
+            if (obj == null || obj is not SceneAsset scene) return false;
+            sceneName = scene.name;
+            scenePath = AssetDatabase.GetAssetPath(scene);
+            return true;
+
         }
 
         public override bool SetEditorAsset(UnityEngine.Object value)

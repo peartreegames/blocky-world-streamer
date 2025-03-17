@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using PeartreeGames.BlockyWorldEditor;
+using PeartreeGames.Blocky.WorldEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace PeartreeGames.BlockyWorldStreamer
+namespace PeartreeGames.Blocky.WorldStreamer
 {
     public static class BlockyWorldUtilities
     {
@@ -15,7 +15,6 @@ namespace PeartreeGames.BlockyWorldStreamer
         public const int SceneQuadSize = 50;
         public static float SceneQuadExtents => SceneQuadSize / 2f;
         public static readonly Regex WorldSceneRegex = new(@"^world_.*\)$");
-        public static readonly Regex DaySceneRegex = new(@"^world_.*\)_\d*$");
 
         public static List<Vector2Int> GetNeighbouringCells(Vector2Int pos)
         {
@@ -46,7 +45,7 @@ namespace PeartreeGames.BlockyWorldStreamer
             return new Vector2Int(int.Parse(numbers[0]), int.Parse(numbers[1]));
         }
 
-        public static string GetSceneNameFromCell(Vector2Int pos) => $"{ScenePrefix}{pos}";
+        public static string GetSceneNameFromCell(string key, Vector2Int pos) => $"{ScenePrefix}{key}{pos}";
         
         public static Vector3 GetCellPosition(Vector3Int target) =>
             BlockyUtilities.SnapToGrid(target - BlockyUtilities.GridOffset, 0, SceneGridSize) + BlockyUtilities.GridOffset;
@@ -112,8 +111,7 @@ namespace PeartreeGames.BlockyWorldStreamer
             offset = new Vector3(-0.5f, -0.5f, -0.5f);
             for (var i = minHeight; i <= maxHeight; i++)
             {
-                if (!colliderPositions.ContainsKey(i)) continue;
-                var cols = colliderPositions[i];
+                if (!colliderPositions.TryGetValue(i, out var cols)) continue;
                 if (cols.list.Count == 0) continue;
                 var bounds = DecomposeBounds(cols.list.ToArray());
                 foreach (var bound in bounds)
@@ -169,6 +167,34 @@ namespace PeartreeGames.BlockyWorldStreamer
                 }
             }
 
+            var rects = new List<BlockyRectangle>();
+            while (set.Count > 0)
+            {
+                var best = FindMaximal();
+                for (var y = best.BottomRight.y; y <= best.TopLeft.y; y++)
+                {
+                    for (var x = best.TopLeft.x; x <= best.BottomRight.x; x++)
+                    {
+                        matrix[y][x] = 0;
+                        set.Remove((x + iXMin, y + iYMin));
+                    }
+                }
+
+                rects.Add(best);
+            }
+
+            foreach (var r in rects)
+            {
+                var left = r.TopLeft + pMin;
+                var right = r.BottomRight + pMin;
+                var center = new Vector3((left.x + right.x) / 2f + 0.5f, p1.y, (left.y + right.y) / 2f + 0.5f);
+                var extends = new Vector3(Mathf.Abs(center.x - left.x), height,
+                    Mathf.Abs(center.z - right.y)) * 2;
+                result.Add(new Bounds(center, extends));
+            }
+
+            return result.ToArray();
+
             void UpdateCache(IReadOnlyList<int> row)
             {
                 for (var m = 0; m < maxX; m++)
@@ -223,34 +249,6 @@ namespace PeartreeGames.BlockyWorldStreamer
 
                 return bestRect;
             }
-
-            var rects = new List<BlockyRectangle>();
-            while (set.Count > 0)
-            {
-                var best = FindMaximal();
-                for (var y = best.BottomRight.y; y <= best.TopLeft.y; y++)
-                {
-                    for (var x = best.TopLeft.x; x <= best.BottomRight.x; x++)
-                    {
-                        matrix[y][x] = 0;
-                        set.Remove((x + iXMin, y + iYMin));
-                    }
-                }
-
-                rects.Add(best);
-            }
-
-            foreach (var r in rects)
-            {
-                var left = r.TopLeft + pMin;
-                var right = r.BottomRight + pMin;
-                var center = new Vector3((left.x + right.x) / 2f + 0.5f, p1.y, (left.y + right.y) / 2f + 0.5f);
-                var extends = new Vector3(Mathf.Abs(center.x - left.x), height,
-                    Mathf.Abs(center.z - right.y)) * 2;
-                result.Add(new Bounds(center, extends));
-            }
-
-            return result.ToArray();
         }
 
         public static readonly string[] ExceptionNames = {"Exclusions", "Colliders"};

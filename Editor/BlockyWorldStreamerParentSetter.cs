@@ -1,8 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using PeartreeGames.BlockyWorldEditor;
-using PeartreeGames.BlockyWorldEditor.Editor;
+using PeartreeGames.Blocky.WorldEditor;
+using PeartreeGames.Blocky.WorldEditor.Editor.Attributes;
+using PeartreeGames.Blocky.WorldEditor.Editor.BlockyParentSetter;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
@@ -12,10 +13,11 @@ using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using Random = UnityEngine.Random;
 
-namespace PeartreeGames.BlockyWorldStreamer.Editor
+namespace PeartreeGames.Blocky.WorldStreamer.Editor
 {
     public class BlockyWorldStreamerParentSetter : BlockyParentSetter
     {
+        [SerializeField] private BlockyWorldKey worldKey;
         [SerializeField] private bool randomHeight;
         [SerializeField] private Vector2Int currentCell;
         private static readonly Dictionary<string, GameObject> MapParents = new();
@@ -43,7 +45,7 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
 
             foreach (var neighbour in neighbours)
             {
-                var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(neighbour);
+                var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(worldKey.Key, neighbour);
                 var foundScene = sceneGuids.FirstOrDefault(sceneGuid =>
                     GetSceneNameFromPath(AssetDatabase.GUIDToAssetPath(sceneGuid)) == sceneName);
                 if (foundScene == string.Empty) continue;
@@ -99,16 +101,16 @@ namespace PeartreeGames.BlockyWorldStreamer.Editor
                 }
                 block.transform.position += offset;
             }
-            return GetParent(block, "Map", "World");
+            return GetParent(block, worldKey, "Map", "World");
         }
 
-        public static Transform GetParent(BlockyObject block, string mapParentName, string assetGroupName)
+        public static Transform GetParent(BlockyObject block, BlockyWorldKey key, string mapParentName, string assetGroupName)
         {
             var position = block.transform.position;
             var pos = Vector3Int.RoundToInt(position);
             var center = BlockyWorldUtilities.GetCellPosition(pos);
             var cell = BlockyWorldUtilities.GetCellFromWorldPosition(position);
-            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
+            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(key.Key, cell);
             if (!MapParents.TryGetValue($"{sceneName}_{mapParentName}", out var mapParent))
             {
                 var sceneGuids = AssetDatabase.FindAssets("t:Scene");

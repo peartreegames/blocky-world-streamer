@@ -1,28 +1,35 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using PeartreeGames.Blocky.WorldEditor;
 using PeartreeGames.Evt.Variables;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.ResourceProviders;
 using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
 
-namespace PeartreeGames.BlockyWorldStreamer
+namespace PeartreeGames.Blocky.WorldStreamer
 {
-    [DefaultExecutionOrder(-100)]
+    [DefaultExecutionOrder(-10000)]
     public class BlockySceneManager : MonoBehaviour
     {
-        [SerializeField] private EvtTransform target;
+        [SerializeField] private AssetReferenceT<EvtTransform> targetRef;
         [SerializeField] private float loadDelay = 2f;
         [SerializeField] private bool debug;
         [SerializeField] private bool quickLoad;
-        [SerializeField] private EvtInt dayObject;
+        [SerializeField, Tooltip("First key will be used as default")] private List<BlockyWorldKey> keys;
+        private EvtTransform _target;
+
+        public static List<BlockyWorldKey> WorldKeys { get; set; }
+        public static BlockyWorldKey WorldKey { get; private set; }
 
         public List<EvtBool> readyObjects;
 
-        public static readonly EvtEvent OnWorldSceneReady = new();
-        public static bool DaySceneReadyToLoad { get; set; }
-
+        public static Action OnWorldSceneReady;
+        public static Action<Scene> OnSceneAlreadyLoaded;
         private Vector2Int CurrentCell { get; set; }
         private Vector2Int NextCell { get; set; }
 
@@ -31,11 +38,10 @@ namespace PeartreeGames.BlockyWorldStreamer
         private (Vector2Int cell, IEnumerator co) _loadingCoroutine;
         private float _loadDelay;
         private bool _isLoading;
-
-
         private void Awake()
         {
-            DaySceneReadyToLoad = false;
+            WorldKeys = keys;
+            if (WorldKey == null) WorldKey = keys[0];
 #if !DEVELOPMENT_BUILD && !UNITY_EDITOR
             quickLoad = false;
 #endif
@@ -52,29 +58,47 @@ namespace PeartreeGames.BlockyWorldStreamer
             _loadedScenes = new Dictionary<Vector2Int, SceneInstance>();
         }
 
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            keys = AssetDatabase.FindAssets("t:BlockyWorldKey")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Select(AssetDatabase.LoadAssetAtPath<BlockyWorldKey>)
+                .Where(k => k != null).ToList();
+        }
+#endif
+
+        public static void SetKey(string keyName)
+        {
+            Debug.Assert(WorldKeys != null, "WorldKeys is null");
+            var key = WorldKeys.Find(k => k.Name == keyName);
+            Debug.Assert(key != null, "WorldKey not found!");
+            WorldKey = key;
+        }
+
         private IEnumerator Start()
         {
             enabled = false;
-            while (target.Value == null) yield return null;
+            var targetAo = targetRef.LoadAssetAsync();
+            yield return targetAo;
+            _target = targetAo.Result;
+            while (_target.Value == null) yield return null;
             SceneManager.SetActiveScene(gameObject.scene);
 
-            CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
+            CurrentCell = BlockyWorldUtilities.GetCellFromWorldPosition(_target.Value.position);
 
-            yield return LoadSceneCell(CurrentCell);
-            foreach (var load in GetNeighbourLoadsAndUnloads(CurrentCell).toLoad)
+            yield return StartCoroutine(LoadSceneCell(CurrentCell));
+            var list = GetNeighbourLoadsAndUnloads(CurrentCell).toLoad.Select(key => LoadSceneCell(key));
+            foreach (var load in list)
             {
-                if (quickLoad) StartCoroutine(LoadSceneCell(load));
-                else yield return LoadSceneCell(load);
+                yield return load;
             }
 
             if (!quickLoad)
             {
                 while (!readyObjects.TrueForAll(obj => obj.Value))
-                {
-                    Debug.LogWarning(
-                        "[BlockySceneManager#Start] Waiting on ReadyObject " +
-                        $"{string.Join(',', readyObjects.Where(r => !r.Value).Select(r => r.name))}");
-                }
+                    yield return null;
 
                 yield return null;
             }
@@ -83,9 +107,15 @@ namespace PeartreeGames.BlockyWorldStreamer
             OnWorldSceneReady?.Invoke();
         }
 
+        private void OnDestroy()
+        {
+            if (targetRef.IsValid() && targetRef.OperationHandle.IsDone) targetRef.ReleaseAsset();
+        }
+
         private void Update()
         {
-            var targetCell = BlockyWorldUtilities.GetCellFromWorldPosition(target.Value.position);
+            if (_target.Value == null) return;
+            var targetCell = BlockyWorldUtilities.GetCellFromWorldPosition(_target.Value.position);
             if (targetCell == CurrentCell) _loadDelay = loadDelay;
             if (targetCell == NextCell) _loadDelay -= Time.deltaTime;
             else NextCell = targetCell;
@@ -107,20 +137,24 @@ namespace PeartreeGames.BlockyWorldStreamer
 
         public void RequestSceneLoad(Vector2Int cell)
         {
-            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
-            if (!SceneManager.GetSceneByName(sceneName).isLoaded) EnqueueLoad(cell, 20);
+            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(WorldKey.Key, cell);
+            var scene = SceneManager.GetSceneByName(sceneName);
+            if (!scene.isLoaded) EnqueueLoad(cell, 20);
+            else OnSceneAlreadyLoaded?.Invoke(scene);
             EnqueueNeighbours(cell);
         }
 
         private void EnqueueLoad(Vector2Int cell, int priority = 10)
         {
-            if (_loadingCoroutine.cell == cell && _loadingCoroutine.co != null) StopCoroutine(_loadingCoroutine.co);
+            if (_loadingCoroutine.cell == cell && _loadingCoroutine.co != null)
+                StopCoroutine(_loadingCoroutine.co);
             _actions.RemoveAll(action => action.Cell == cell);
             var action = new BlockySceneAction(cell, LoadSceneCell, priority);
             _actions.Add(action);
         }
 
-        private (HashSet<Vector2Int> toLoad, HashSet<Vector2Int> toUnload) GetNeighbourLoadsAndUnloads(Vector2Int cell)
+        private (HashSet<Vector2Int> toLoad, HashSet<Vector2Int> toUnload)
+            GetNeighbourLoadsAndUnloads(Vector2Int cell)
         {
             var toLoad = BlockyWorldUtilities.GetNeighbouringCells(cell).ToHashSet();
             var toUnload = _loadedScenes.Keys.ToHashSet();
@@ -138,7 +172,8 @@ namespace PeartreeGames.BlockyWorldStreamer
 
         private void EnqueueUnload(Vector2Int cell)
         {
-            if (_loadingCoroutine.cell == cell && _loadingCoroutine.co != null) StopCoroutine(_loadingCoroutine.co);
+            if (_loadingCoroutine.cell == cell && _loadingCoroutine.co != null)
+                StopCoroutine(_loadingCoroutine.co);
             _actions.RemoveAll(action => action.Cell == cell);
             _actions.Add(new BlockySceneAction(cell, UnloadSceneCell, 0));
         }
@@ -158,39 +193,26 @@ namespace PeartreeGames.BlockyWorldStreamer
         private IEnumerator LoadSceneCell(Vector2Int cell)
         {
             _isLoading = true;
-            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(cell);
-            if (SceneManager.GetSceneByName(sceneName).isLoaded || _loadedScenes.ContainsKey(cell)) goto loadDay;
+            var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(WorldKey.Key, cell);
+            if (SceneManager.GetSceneByName(sceneName).isLoaded || _loadedScenes.ContainsKey(cell))
+                goto complete;
+            
+            #if UNITY_EDITOR
+            #endif
 
             var key = Addressables.LoadResourceLocationsAsync(sceneName);
-            while (!key.IsDone) yield return null;
+            yield return key; 
             if (key.Result.Count == 0) goto complete;
 
-            var loadAo = Addressables.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
+            var loadAo = Addressables.LoadSceneAsync(sceneName, LoadSceneMode.Additive, false);
             if (!loadAo.IsValid()) goto complete;
-
-            while (!loadAo.IsDone) yield return null;
-            _loadedScenes.TryAdd(cell, loadAo.Result);
-            yield return new WaitForSeconds(0.2f);
-
-            loadDay:
-            if (!DaySceneReadyToLoad)
+            yield return loadAo;
+            if (!_loadedScenes.TryAdd(cell, loadAo.Result))
             {
-                var action = new BlockySceneAction(cell, LoadSceneCell, 10);
-                _actions.Add(action);
-                goto complete;
+                Debug.LogError($"Could not add {cell} to _loadedScenes");
             }
-
-            var day = $"{dayObject.Value:000}";
-            var daySceneName = $"{sceneName}_{day}";
-            if (SceneManager.GetSceneByName(daySceneName).isLoaded) goto complete;
-            var dayKey = Addressables.LoadResourceLocationsAsync(daySceneName);
-            while (!dayKey.IsDone) yield return null;
-            if (dayKey.Result.Count == 0) goto complete;
-            var dayLoadAo = Addressables.LoadSceneAsync(daySceneName, LoadSceneMode.Additive);
-            if (!dayLoadAo.IsValid()) goto complete;
-
-            while (!dayLoadAo.IsDone) yield return null;
-
+            
+            yield return loadAo.Result.ActivateAsync();
             complete:
             _isLoading = false;
         }
@@ -198,7 +220,8 @@ namespace PeartreeGames.BlockyWorldStreamer
         private void OnDrawGizmos()
         {
             if (!debug) return;
-            var size = new Vector3(BlockyWorldUtilities.SceneGridSize, 0, BlockyWorldUtilities.SceneGridSize);
+            var size = new Vector3(BlockyWorldUtilities.SceneGridSize, 0,
+                BlockyWorldUtilities.SceneGridSize);
             Gizmos.color = Color.cyan;
             var neighbours = BlockyWorldUtilities.GetNeighbouringCells(CurrentCell);
             for (var x = -25; x < 25; x++)
@@ -225,9 +248,9 @@ namespace PeartreeGames.BlockyWorldStreamer
                 }
             }
 
-            if (target.Value == null) return;
+            if (_target.Value == null) return;
             Gizmos.color = new Color(0.4f, 1, 0.4f, 1);
-            Gizmos.DrawSphere(target.Value.position, 3);
+            Gizmos.DrawSphere(_target.Value.position, 3);
         }
     }
 }

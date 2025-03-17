@@ -1,7 +1,6 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 
-namespace PeartreeGames.BlockyWorldStreamer
+namespace PeartreeGames.Blocky.WorldStreamer
 {
     public class BlockyRectangle
     {
