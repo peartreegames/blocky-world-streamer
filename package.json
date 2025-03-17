@@ -9,7 +9,7 @@
   "changelogUrl": "https://github.com/peartreegames/blocky-world-streamer/changelog.html",
   "licensesUrl": "https://github.com/peartreegames/blocky-world-streamer/licensing.html",
   "dependencies": {
-    "games.peartree.blocky.editor": "0.2.0",
+    "games.peartree.blocky.world": "0.2.0",
     "games.peartree.evt.variables": "0.3.7",
     "com.unity.modules.uielements": "0.1.0",
     "com.unity.editorcoroutines": "1.0.0"
