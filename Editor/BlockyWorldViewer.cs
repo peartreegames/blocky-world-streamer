@@ -15,7 +15,8 @@ namespace PeartreeGames.Blocky.Streamer.Editor
     {
         private const int Size = 512;
         [SerializeField] private SceneAsset overworldScene;
-        [SerializeField] private BlockyWorldViewerSettings settings;
+        [SerializeField] private BlockyWorldKey worldKey;
+        private BlockyWorldKey.Scene _selected;
 
         [MenuItem("Tools/Blocky/WorldViewer")]
         private static void ShowWindow()
@@ -49,39 +50,54 @@ namespace PeartreeGames.Blocky.Streamer.Editor
             Subscribe();
             rootVisualElement.styleSheets.Add(Resources.Load<StyleSheet>("BlockyWorldViewer"));
 
-            var overworld = new ObjectField("Overworld")
+            var overworld = new ObjectField("Orchestrator")
             {
                 objectType = typeof(SceneAsset),
                 value = overworldScene
             };
             overworld.RegisterValueChangedCallback(v => overworldScene = (SceneAsset)v.newValue);
             rootVisualElement.Add(overworld);
-            
-            var field = new ObjectField("Settings")
+
+            var dropdown = new PopupField<BlockyWorldKey>("WorldKey", GetKeyChoices(), 0, 
+                key => key == null ? "None" : key.name,
+                key => key == null ? "None" : key.name)
             {
-               objectType = typeof(BlockyWorldViewerSettings),
-               value = settings
+                value = worldKey
             };
-            field.RegisterValueChangedCallback(v => settings = (BlockyWorldViewerSettings)v.newValue);
-            rootVisualElement.Add(field);
+
+            dropdown.RegisterCallback<MouseDownEvent>(_ =>
+            {
+                var choices = GetKeyChoices();
+                dropdown.choices = choices;
+            });
+            
+            dropdown.RegisterValueChangedCallback(v =>
+            {
+                worldKey = v.newValue;
+                RefreshWorldGrid();
+            });
+            rootVisualElement.Add(dropdown);
 
             var openGroup = new GroupBox();
             openGroup.AddToClassList("horizontal");
             var single = new Button(() =>
             {
-                if (settings.Selected == null) return;
+                if (_selected?.reference == null) return;
                 EditorSceneManager.SaveOpenScenes();
-                var scene = EditorSceneManager.OpenScene(settings.Selected.reference.ScenePath, OpenSceneMode.Single);
-                EditorSceneManager.OpenScene(AssetDatabase.GetAssetPath(overworldScene), OpenSceneMode.Additive);
-                SceneManager.SetActiveScene(scene);
+                EditorSceneManager.OpenScene(_selected.reference.ScenePath, OpenSceneMode.Single);
+                if (overworldScene != null)
+                {
+                    var main = EditorSceneManager.OpenScene(AssetDatabase.GetAssetPath(overworldScene), OpenSceneMode.Additive);
+                    SceneManager.SetActiveScene(main);
+                }
                 RefreshWorldGrid();
             }) { text = "Open Scene Single" };
             single.AddToClassList("grow");
             openGroup.Add(single);
             var add = new Button(() =>
             {
-                if (settings.Selected == null) return;
-                EditorSceneManager.OpenScene(settings.Selected.reference.ScenePath,
+                if (_selected?.reference == null) return;
+                EditorSceneManager.OpenScene(_selected.reference.ScenePath,
                     OpenSceneMode.Additive);
                 RefreshWorldGrid();
             }) { text = "Open Scene Additive" };
@@ -90,15 +106,23 @@ namespace PeartreeGames.Blocky.Streamer.Editor
             rootVisualElement.Add(openGroup);
             rootVisualElement.Add(new Button(() =>
             {
-                if (settings.Selected == null) return;
+                if (_selected?.reference == null) return;
                 EditorCoroutineUtility.StartCoroutineOwnerless(
                     TakeScreenshot(
-                        SceneManager.GetSceneByPath(settings.Selected.reference.ScenePath)));
+                        SceneManager.GetSceneByPath(_selected.reference.ScenePath)));
             }) { text = "Screenshot Selected Scene" });
 
             var refresh = new Button(RefreshWorldGrid) { text = "Refresh" };
             rootVisualElement.Add(refresh);
             RefreshWorldGrid();
+            yield break;
+
+            List<BlockyWorldKey> GetKeyChoices()
+            {
+                var worldKeys = AssetDatabase.FindAssets("t:BlockyWorldKey");
+                return worldKeys.Select(AssetDatabase.GUIDToAssetPath)
+                    .Select(AssetDatabase.LoadAssetAtPath<BlockyWorldKey>).ToList();
+            }
         }
 
         private void OnPlayModeChange(PlayModeStateChange state)
@@ -143,7 +167,7 @@ namespace PeartreeGames.Blocky.Streamer.Editor
 
         private void RefreshWorldGrid()
         {
-            if (settings == null || settings.worldKey == null) return;
+            if (worldKey == null) return;
             var prev = rootVisualElement.Q("Grid");
             if (prev != null) rootVisualElement.Remove(prev);
 
@@ -175,7 +199,7 @@ namespace PeartreeGames.Blocky.Streamer.Editor
             var minY = int.MaxValue;
             var maxY = int.MinValue;
 
-            foreach (var scene in settings.scenes)
+            foreach (var scene in worldKey.scenes)
             {
                 if (minX > scene.key.x) minX = scene.key.x;
                 if (maxX < scene.key.x) maxX = scene.key.x;
@@ -190,21 +214,21 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                 for (var y = maxY; y >= minY; y--)
                 {
                     var key = new Vector2Int(x, y);
-                    var viewer = settings.scenes.Find(s => s.key == key);
+                    var viewer = worldKey.scenes.Find(s => s.key == key);
                     var button = new Button
                     {
                         userData = viewer
                     };
                     buttons.Add(button);
                     button.AddToClassList("preview");
-                    if (viewer != null)
+                    if (viewer != null && viewer.reference != null)
                     {
                         if (active == viewer.reference.SceneName)
                             button.AddToClassList("preview-active");
                         else if (SceneManager.GetSceneByName(viewer.reference.SceneName).isLoaded)
                             button.AddToClassList("preview-loaded");
 
-                        if (viewer == settings.Selected) button.AddToClassList("preview-selected");
+                        if (viewer == _selected) button.AddToClassList("preview-selected");
                         var img = new Image { image = viewer.texture };
                         img.AddToClassList("preview-image");
                         button.Add(img);
@@ -224,17 +248,17 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                 foreach (var btn in buttons)
                 {
                     btn.RemoveFromClassList("preview-selected");
-                    var sceneName = (btn.userData as BlockyWorldViewerSettings.Scene)?.reference
-                        .SceneName;
+                    var sceneName = (btn.userData as BlockyWorldKey.Scene)?.reference?.SceneName;
+                    if (string.IsNullOrEmpty(sceneName)) continue;
                     if (active == sceneName) btn.AddToClassList("preview-active");
                     else if (SceneManager.GetSceneByName(sceneName).isLoaded)
                         btn.AddToClassList("preview-loaded");
                 }
 
-                if (settings.Selected == button?.userData) settings.Selected = null;
+                if (_selected == button?.userData) _selected = null;
                 else if (button?.userData != null)
                 {
-                    settings.Selected = button.userData as BlockyWorldViewerSettings.Scene;
+                    _selected = button.userData as BlockyWorldKey.Scene;
                     button.RemoveFromClassList("preview-active");
                     button.RemoveFromClassList("preview-loaded");
                     button.AddToClassList("preview-selected");
@@ -255,18 +279,18 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                 yield break;
             }
             yield return new EditorWaitForSeconds(0.1f);
-            Undo.RecordObject(settings, "Checked Scene Viewer");
             var key = BlockyWorldUtilities.GetCellFromSceneName(scene.name);
-            var viewerScene = settings.scenes.Find(s => s.key == key);
+            var viewerScene = worldKey.scenes.Find(s => s.key == key);
             if (viewerScene == null)
             {
-                viewerScene = new BlockyWorldViewerSettings.Scene();
-                settings.scenes.Add(viewerScene);
+                viewerScene = new BlockyWorldKey.Scene();
+                worldKey.scenes.Add(viewerScene);
             }
 
             viewerScene.key = key;
             viewerScene.reference =
                 new BlockySceneReference(AssetDatabase.LoadAssetAtPath<SceneAsset>(scene.path));
+            EditorUtility.SetDirty(worldKey);
             var texture = new Texture2D(Size, Size, TextureFormat.ARGB32, false)
             {
                 name = scene.name
@@ -278,7 +302,7 @@ namespace PeartreeGames.Blocky.Streamer.Editor
 
             var cam = new GameObject().AddComponent<Camera>();
             cam.orthographic = true;
-            cam.cullingMask = settings.cameraMask;
+            cam.cullingMask = worldKey.cameraMask;
             cam.farClipPlane = 2000;
             cam.orthographicSize = 50;
 
@@ -291,26 +315,34 @@ namespace PeartreeGames.Blocky.Streamer.Editor
 
             var currentRT = RenderTexture.active;
             var rt = new RenderTexture(Size, Size, 24, RenderTextureFormat.ARGB32);
-            RenderTexture.active = rt;
-            cam.targetTexture = rt;
-            cam.Render();
-            texture.ReadPixels(new Rect(0, 0, Size, Size), 0, 0, false);
-            texture.Apply(false);
-
-            var subAssets = AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GetAssetPath(settings));
-            foreach (var asset in subAssets)
+            try
             {
-                if (asset.name == texture.name) AssetDatabase.RemoveObjectFromAsset(asset);
-            }
+                RenderTexture.active = rt;
+                cam.targetTexture = rt;
+                cam.Render();
+                texture.ReadPixels(new Rect(0, 0, Size, Size), 0, 0, false);
+                texture.Apply(false);
 
-            AssetDatabase.AddObjectToAsset(texture, settings);
-            viewerScene.texture = texture;
-            AssetDatabase.SaveAssets();
-            RenderTexture.active = currentRT;
+                var subAssets = AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GetAssetPath(worldKey));
+                foreach (var asset in subAssets)
+                {
+                    if (asset != null && asset.name == texture.name) AssetDatabase.RemoveObjectFromAsset(asset);
+                }
+
+                AssetDatabase.AddObjectToAsset(texture, worldKey);
+                viewerScene.texture = texture;
+                AssetDatabase.SaveAssets();
+            }
+            finally
+            {
+                cam.targetTexture = null;
+                RenderTexture.active = currentRT;
+                rt.Release();
+                DestroyImmediate(rt);
+                DestroyImmediate(cam.gameObject);
+                DestroyImmediate(light.gameObject);
+            }
             yield return new EditorWaitForSeconds(0.1f);
-            rt.Release();
-            DestroyImmediate(cam.gameObject);
-            DestroyImmediate(light.gameObject);
             RefreshWorldGrid();
         }
     }

@@ -48,7 +48,8 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                 else
                 {
                     child.gameObject.SetActive(true);
-                    if (child.transform.childCount > 0 && child.transform.GetChild(0) != null) child.transform.GetChild(0).gameObject.SetActive(true);
+                    foreach (Transform grandchild in child.transform)
+                        grandchild.gameObject.SetActive(true);
                 }
             }
 

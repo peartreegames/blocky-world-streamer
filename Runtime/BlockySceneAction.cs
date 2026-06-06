@@ -20,6 +20,6 @@ namespace PeartreeGames.Blocky.Streamer
         public int CompareTo(BlockySceneAction other) => _priority.CompareTo(other._priority);
         public bool Equals(BlockySceneAction other) => Cell.Equals(other.Cell);
         public override bool Equals(object obj) => obj is BlockySceneAction other && Equals(other);
-        public override int GetHashCode() => HashCode.Combine(Cell, _priority);
+        public override int GetHashCode() => Cell.GetHashCode();
     }
 }

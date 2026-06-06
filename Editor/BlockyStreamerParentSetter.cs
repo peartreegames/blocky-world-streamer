@@ -48,10 +48,10 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                 var sceneName = BlockyWorldUtilities.GetSceneNameFromCell(worldKey.Key, neighbour);
                 var foundScene = sceneGuids.FirstOrDefault(sceneGuid =>
                     GetSceneNameFromPath(AssetDatabase.GUIDToAssetPath(sceneGuid)) == sceneName);
-                if (foundScene == string.Empty) continue;
+                if (string.IsNullOrEmpty(foundScene)) continue;
                 var neighbourScene = SceneManager.GetSceneByName(sceneName);
                 if (neighbourScene.isLoaded) continue;
-                var path = $"Assets/Scenes/World/{sceneName}.unity";
+                var path = $"Assets/Scenes/World/{worldKey.Key}/{sceneName}.unity";
                 if (!File.Exists(path)) continue;
                 EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
             }
@@ -126,7 +126,7 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                             baseSettings.DefaultGroup.Schemas);
                     scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
                     scene.name = sceneName;
-                    EditorSceneManager.SaveScene(scene, $"Assets/Scenes/World/{sceneName}.unity");
+                    EditorSceneManager.SaveScene(scene, $"Assets/Scenes/World/{key.Key}/{sceneName}.unity");
                     var guid = AssetDatabase.AssetPathToGUID(scene.path);
                     var entry = baseSettings.CreateOrMoveEntry(guid, group);
                     entry.address = sceneName;
@@ -137,7 +137,7 @@ namespace PeartreeGames.Blocky.Streamer.Editor
                 {
                     scene = SceneManager.GetSceneByName(sceneName);
                     if (!scene.isLoaded)
-                        scene = EditorSceneManager.OpenScene($"Assets/Scenes/World/{sceneName}.unity",
+                        scene = EditorSceneManager.OpenScene($"Assets/Scenes/World/{key.Key}/{sceneName}.unity",
                             OpenSceneMode.Additive);
                     BlockyWorldStreamerScenePreprocessor.RevertScene(scene);
                 }

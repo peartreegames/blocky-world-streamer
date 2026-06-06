@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace PeartreeGames.Blocky.Streamer.Editor
         public int callbackOrder => -1;
         public void OnProcessScene(Scene scene, BuildReport report)
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             var mapParent = BlockyStreamerParentSetter.GetMapParent(scene, "Map");
             if (mapParent == null) return;
             var children = mapParent.transform.Cast<Transform>().Select(t => t.gameObject).ToArray();

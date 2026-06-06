@@ -15,6 +15,7 @@ namespace PeartreeGames.Blocky.Streamer
         public const int SceneQuadSize = 50;
         public static float SceneQuadExtents => SceneQuadSize / 2f;
         public static readonly Regex WorldSceneRegex = new(@"^world_.*\)$");
+        private static readonly Regex CellFromNameRegex = new(@"\((?<numbers>[^)]*)\)", RegexOptions.Compiled);
 
         public static List<Vector2Int> GetNeighbouringCells(Vector2Int pos)
         {
@@ -39,8 +40,7 @@ namespace PeartreeGames.Blocky.Streamer
 
         public static Vector2Int GetCellFromSceneName(string name)
         {
-            var regex = new Regex(@"\((?<numbers>[^)]*)\)");
-            var match = regex.Match(name).Groups["numbers"];
+            var match = CellFromNameRegex.Match(name).Groups["numbers"];
             var numbers = match.Value.Split(',');
             return new Vector2Int(int.Parse(numbers[0]), int.Parse(numbers[1]));
         }
